@@ -5,6 +5,21 @@ All notable changes to HEIMDALL are recorded here. Versions are CalVer,
 
 ## [Unreleased]
 
+### Fixed
+
+- The registry diff never compared an application's overlays or variables,
+  and its patch never wrote them — an overlay change in the manifest
+  silently never propagated, and a removed overlay file left the document
+  rendering a path that no longer exists (HD0240). Found by the staging
+  environment's first overlay removal; regression-tested.
+
+### Changed
+
+- The Docker Engine API pin moves from 1.43 to 1.44 (Docker Engine 25,
+  January 2024). Modern engines now enforce a minimum client API version
+  and refused the old pin outright — found by the first live agent
+  enrollment, not by any fake.
+
 ### Added
 
 - The ECS adapter registers a service into a load-balancer target group when

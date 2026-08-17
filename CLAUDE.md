@@ -101,7 +101,16 @@ change, not a follow-up task.
 - **Never depend on Docker's compose→ECS/ACI integration.** It was deprecated in 2023.
   Adapters call the AWS, Azure, and GCP SDKs directly.
 - **Never silently drop a compose directive.** Unsupported features are rejected at plan
-  time by `Capabilities()`, with a message naming the offending line.
+  time by `Capabilities()`, with a message naming the offending line. `Capabilities()`
+  answers "can this runtime express X"; **render** answers "is this compose file
+  self-consistent". A contradiction true on every runtime belongs in render, once.
+- **HEIMDALL never owns a clock.** Scheduled workloads register with the runtime's own
+  scheduler (EventBridge Scheduler, ACA Jobs, Cloud Scheduler) or with the `heimdall
+  agent` on Docker targets. A control-plane-owned cron would miss runs across a restart
+  and double-fire across active/passive failover. A Docker target with no agent rejects a
+  scheduled service at plan time.
+- **Deleting a scheduled service deletes its schedule registration first.** An orphaned
+  rule fires at 03:00 forever against a stale image. The conformance suite asserts this.
 - **Adapters are the only code that knows a cloud exists.** Nothing outside
   `internal/provider/<name>/` imports a cloud SDK.
 - **The web tier decides nothing.** Tachyon attaches a session and forwards; it holds
