@@ -2,7 +2,8 @@
 .env
 .env.*
 !.env.example
-secrets/
+# Root-anchored: internal/secrets and the docs' secrets pages are source
+/secrets/
 *.key
 # Points at a local control plane; only the example ships
 web/server/data/bff.json
@@ -10,7 +11,8 @@ web/server/data/bff.json
 # Runtime state: FYLO roots and SESAME deployments must never be committed
 .heimdall/
 fylo-root/
-data/
+# Root-anchored: web/server/data holds the committed bff.example.json
+/data/
 
 # Build and test output
 bin/

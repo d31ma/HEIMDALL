@@ -19,8 +19,10 @@ env:
   # nothing. These versions are pinned together and upgraded together.
   SESAME_VERSION: v26.33.02
   FYLO_VERSION: v26.33.02
-  CHEX_VERSION: latest
-  TACHYON_VERSION: latest
+  # Pinned like the pair above — and CHEX's install.sh treats its version
+  # env verbatim, so "latest" builds a vlatest URL and 404s.
+  CHEX_VERSION: v26.32.02
+  TACHYON_VERSION: v26.33.02
   # sops and age back the sops/ secret scheme end-to-end tests, installed
   # through the Go module proxy so the checksum database pins them.
   SOPS_MODULE: github.com/getsops/sops/v3/cmd/sops@v3.9.4
