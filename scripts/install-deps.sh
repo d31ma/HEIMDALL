@@ -39,6 +39,9 @@ install_release() {
   chmod +x "$destination/$name"
 }
 
+# TTID first: FYLO reports dependencies.ttid.available=false without it,
+# and SESAME refuses to drive a FYLO in that state.
+install_release TTID "${TTID_VERSION:-latest}"
 install_release FYLO "${FYLO_VERSION:-latest}"
 install_release SESAME "${SESAME_VERSION:-latest}"
 install_release CHEX "${CHEX_VERSION:-latest}"
@@ -58,6 +61,7 @@ fi
 
 # Fail here rather than inside a test, where a missing binary shows up as a
 # skip and a green build that proved nothing.
+ttid --help > /dev/null
 fylo version
 sesame version
 chex --help > /dev/null

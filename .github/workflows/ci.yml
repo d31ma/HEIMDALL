@@ -23,6 +23,7 @@ env:
   # env verbatim, so "latest" builds a vlatest URL and 404s.
   CHEX_VERSION: v26.32.02
   TACHYON_VERSION: v26.33.02
+  TTID_VERSION: v26.32.03
   # sops and age back the sops/ secret scheme end-to-end tests, installed
   # through the Go module proxy so the checksum database pins them.
   SOPS_MODULE: github.com/getsops/sops/v3/cmd/sops@v3.9.4
@@ -191,7 +192,7 @@ jobs:
         # The e2e drives a real control plane, real SESAME, real ty serve,
         # and a real browser. It is the only place the whole stack meets.
         run: |
-          scripts/vendor-duvay.sh || echo "DuVay checkout not present; pages will fall back to token defaults"
+          scripts/vendor-duvay.sh
           scripts/e2e-web.sh
 
   website:
@@ -217,7 +218,9 @@ jobs:
           ./node_modules/.bin/playwright install --with-deps chromium-headless-shell
 
       - name: Vendor DuVay
-        run: scripts/vendor-duvay.sh || echo "DuVay checkout not present; pages will fall back to token defaults"
+        # The audits gate the real stylesheet; the script fetches the hosted
+        # sheet when no local checkout exists, so this is a hard step.
+        run: scripts/vendor-duvay.sh
 
       - name: Serve the website and run its suite
         # The docs are a product surface with a committed test: entities
@@ -245,7 +248,9 @@ jobs:
           go-version-file: go.mod
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        # v8 installs the v2 line; v6's v1 binaries are built with go1.24
+        # and refuse a go1.26 toolchain directive.
+        uses: golangci/golangci-lint-action@v8
         with:
           version: latest
 

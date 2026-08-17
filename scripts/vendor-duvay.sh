@@ -20,8 +20,13 @@ destinations="web/client/shared/assets/duvay website/client/shared/assets/duvay"
 
 source_file="$source_root/DUVAY/dist/duvay.min.css"
 if [ ! -f "$source_file" ]; then
-  echo "missing $source_file — pass the directory holding the DELMA checkouts" >&2
-  exit 1
+  # No local checkout (CI runners). DuVay is distributed as hosted files;
+  # fetch the same sheet the docs link, so the UI gates test the real
+  # stylesheet rather than token-default fallbacks. Only /latest/ exists —
+  # there is no version-pinned path to prefer.
+  echo "no DUVAY checkout at $source_root; fetching the hosted sheet"
+  source_file=$(mktemp /tmp/duvay.XXXXXX.css)
+  curl -fsSL -o "$source_file" "https://d31ma.github.io/DUVAY/latest/duvay.min.css"
 fi
 
 for destination in $destinations; do
