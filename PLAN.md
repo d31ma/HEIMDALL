@@ -269,6 +269,134 @@ instead), a plugin/CMP system.
 
 ---
 
+## Scheduled and batch workloads
+
+Compose has no way to say "run this at 03:00" or "run this once, then stop". Every target
+runtime supports it natively, so the gap is ours, not theirs: a nightly report, a database
+backup, a retention sweep, and a data import currently have nowhere to live in HEIMDALL.
+
+### The syntax
+
+An extension on the service, following the `x-heimdall-ref` precedent — a mapping rather
+than a label, because a schedule has policy fields and a label can only hold a string.
+
+```yaml
+services:
+  nightly-report:
+    image: registry.example.com/reports:1.4.2
+    command: ["./report", "--daily"]
+    environment:
+      DATABASE_URL: ${secret:aws-sm/us-east-1/prod/db-url}
+    x-heimdall-schedule:
+      cron: "0 3 * * *"        # omit for a manual-only batch job
+      timezone: UTC            # required in spirit; defaults to UTC, never local
+      concurrency: forbid      # forbid | allow | replace
+      deadline: 15m            # a run that cannot start this soon is skipped
+      timeout: 30m             # a run still going at this point is killed and failed
+      retries: 2
+```
+
+`spec.Service` gains `Schedule *Schedule`. It is part of the canonical JSON and therefore
+part of the content hash automatically — a cron change plans as an update, which is exactly
+right, because the schedule *is* desired state.
+
+### A scheduled service is not a running service
+
+This is the crux, and it is a **render-time** concern rather than a `Capabilities()` one.
+`Capabilities()` answers "can this runtime express X"; render answers "is this compose file
+self-consistent". A scheduled service with `ports:` is incoherent on *every* runtime, so it
+is rejected once in render rather than four times in adapters.
+
+Rejected on a scheduled service, each naming the offending line: `ports` (nothing connects
+to a job), `deploy.replicas` (a job has runs, not replicas), `restart` (superseded by
+`retries`), `healthcheck` (there is no steady state to probe), `depends_on` (ordering
+between jobs is a `cron` decision, not a graph).
+
+Kept: `image`, `command`, `entrypoint`, `environment` including `${secret:...}` refs,
+`deploy.resources`, `volumes` where the runtime allows, file secrets, and
+`heimdall.metrics`.
+
+### HEIMDALL never owns the clock
+
+The single most important decision in this slice. HEIMDALL is single-writer with
+active/passive failover, so a control-plane-owned scheduler would miss runs across a
+restart and could double-fire or skip across a failover. Distributed cron is a genuinely
+hard problem and we decline to have it.
+
+| Runtime | Clock owner | Mapping |
+|---|---|---|
+| ECS/Fargate | EventBridge Scheduler | schedule → `RunTask` on the cluster |
+| Azure Container Apps | ACA Jobs | `triggerType: Schedule` + cron |
+| Cloud Run | Cloud Scheduler | → Cloud Run Jobs execution |
+| Docker Engine | **the `heimdall agent`** | the Engine has no scheduler |
+| Docker Swarm | **the `heimdall agent`** | Swarm has no scheduler |
+
+`FeatureScheduled` is `Full` on the three cloud adapters and `Partial` on `docker`/`swarm`
+with the caveat that a scheduled service requires an agent on the target. A Docker target
+with no `AgentID` and a scheduled service **fails at plan time** — the agent survives a
+control-plane outage, and nothing else on those runtimes does.
+
+`catchup` is not implemented and is rejected rather than silently ignored: most cloud
+schedulers cannot express it, and ten missed runs firing at once is worse than ten missed
+runs.
+
+### An execution is an instance that stopped
+
+Rather than a new `Executions()` method and a second UI shape, `Instance` gains two fields:
+`ExitCode *int` and `FinishedAt time.Time`. `Instances()` on a scheduled service returns
+its recent executions, and the whole Phase 3 surface — the instance drawer, per-instance
+`Logs()`, the revision link, the event timeline — works unchanged.
+
+The one genuinely new panel is a **run-duration trend**, derived from execution history
+rather than a metric series, drawn with `w-sparkline`. Failed runs mark red.
+
+`ServiceState` gains `LastRunAt`, `LastRunStatus`, and `NextRunAt`. The existing five
+`Health` values are reused rather than extended — a failed last run and an overdue schedule
+are both `Degraded`, distinguished by `Message`, and the rollup ranking already does the
+right thing.
+
+### Drift, prune, and the 3am footgun
+
+Drift for a scheduled service is read from the **schedule registration**, not from running
+containers: a deleted rule, a cron expression edited in the console, a disabled trigger, or
+a target pointing at a stale task definition are all drift, and all invisible to every
+competitor.
+
+**Prune must delete the schedule.** A pruned service whose rule survives keeps firing at
+03:00 forever — against a deleted task definition if you are lucky and noisy, against a
+stale image if you are unlucky and silent. Every adapter's `OpDelete` path deletes the
+registration before the workload, and the conformance suite asserts it.
+
+### Manual runs
+
+`heimdall run <app> <service>` triggers an out-of-band execution, for a manual-only batch
+job or a re-run after a failure. It gets its own SESAME action, **`app:run`** — running a
+job is not deploying an application, and an operator who may re-run a report should not
+thereby be able to sync. Audited like any mutation.
+
+Sync hooks and scheduled jobs stay distinct concepts: a hook is one-shot work bound to a
+sync's lifecycle, a scheduled job is a standing object with its own history.
+
+### Slice plan — 5 weeks, after the adapters and before GA
+
+1. **Spec and render (1w)** — `Schedule` type, CHEX schema, `x-heimdall-schedule` parsing,
+   cron and timezone validation, the five contradiction rejections, golden hash tests.
+2. **Conformance first, then adapters (2w)** — extend `internal/provider/conformance` with
+   the scheduled-service contract (create, update cron, observe registration, delete
+   removes it), then ECS, ACA, and Cloud Run against it.
+3. **Agent clock (1w)** — schedule evaluation in the agent, concurrency and deadline
+   policy, execution reporting upstream, survives control-plane absence.
+4. **Observability and control (1w)** — executions in the instance drawer, duration trend,
+   `NextRunAt`/`LastRunStatus` in list and detail, `heimdall run`, `app:run` action, drift
+   surfacing for a missing registration.
+
+*Exit:* a compose repo declares a nightly job; it fires on schedule on all five runtimes;
+deleting the service from git removes the schedule; disabling the rule in the cloud console
+shows as drift within one poll; a failed run shows its exit code and logs in the drawer; the
+whole thing works on Docker Engine with the control plane stopped.
+
+---
+
 ## Competitive position — Portainer
 
 [Portainer](https://github.com/portainer/portainer) (38k stars, Go + TypeScript, zlib) is
@@ -463,6 +591,15 @@ configurable concurrency and a failure threshold that halts the wave.
 at plan time with a clear message naming the offending line. One application deploys to a
 50-host group, and a failure on host 7 halts the rollout with the remaining hosts untouched.
 
+### Phase 4S — Scheduled and batch workloads (5 weeks)
+Detailed above. Ordering constraint: after the cloud adapters exist (each needs its own
+scheduler mapping) and before GA (a control plane that cannot express a nightly backup is
+not a complete product). `FeatureScheduled`, `x-heimdall-schedule`, agent-owned clock for
+Docker targets, executions in the instance drawer, `app:run`.
+
+*Exit:* as listed in the slice plan — including the Docker Engine case working with the
+control plane stopped, which is the whole point of not owning the clock.
+
 ### Phase 5 — Enterprise controls (3 weeks)
 Since this is self-hosted only, projects are an RBAC scope rather than a hard isolation
 boundary — this phase is smaller than it would otherwise be. Enterprise SSO (inbound OIDC
@@ -487,7 +624,7 @@ verify a pre-existing session; sustained load with p99 sync latency inside SLO.
 Docs site (Tachyon + DuVay), quickstart, **migration guides from raw `docker compose` and
 from Portainer**, support tiers, versioned public API contract under `api/`, CalVer release.
 
-**Total ≈ 27 weeks.**
+**Total ≈ 32 weeks.**
 
 ### Deferred past GA
 Template catalog (`templates`/`customtemplates` equivalent) — high adoption in Portainer,
@@ -551,6 +688,8 @@ Per-phase gates, each runnable:
 | 9 | Four coupled binaries with a startup order | Low | One image, one supervised entrypoint, `heimdall doctor` that runs `sesame doctor` plus FYLO's checks and reports a single verdict. Version-pin all four and test the matrix in CI |
 | 10 | **Portainer is entrenched** — 38k stars, free tier, and a management GUI HEIMDALL deliberately will not build. "Why not just Portainer?" is the first question every evaluator asks | Med | Do not compete on GUI breadth; compete on the two things it structurally lacks — continuous reconciliation and instance observability — plus RBAC/SSO/audit in the open core rather than behind a licence. The Phase 7 migration guide should import Portainer stacks and environments so the switching cost is hours, not weeks |
 | 11 | Fan-out to large groups turns one mistake into a fleet-wide outage | Med | Bounded rollout concurrency, a failure threshold that halts the wave, and per-target `hd-operations` documents so a partial rollout is inspectable and resumable rather than an all-or-nothing retry |
+| 12 | **An orphaned schedule keeps firing after its service is gone** — silently running a stale image, or noisily failing at 03:00 forever | Med | Every adapter deletes the schedule registration before the workload on `OpDelete`, and the conformance suite asserts a deleted service leaves no registration behind. Drift detection reads the registration, so a survivor is visible rather than merely absent from the desired state |
+| 13 | Cron plus daylight saving is a recurring source of "it ran twice" and "it never ran" | Low | Timezone is explicit in `x-heimdall-schedule` and defaults to UTC, never the host's local zone. ACA Jobs is UTC-only, which is a `Partial` caveat rather than a silent conversion |
 
 ---
 

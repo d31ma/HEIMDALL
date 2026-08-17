@@ -24,8 +24,11 @@ import (
 )
 
 // apiVersion is pinned. An Engine older than this is refused at Ping rather
-// than failing later on a field that quietly changed shape.
-const apiVersion = "v1.43"
+// than failing later on a field that quietly changed shape. 1.44 is Docker
+// Engine 25 (January 2024); modern engines have begun refusing anything
+// older as a *client* minimum, which is how the first live agent found the
+// previous pin.
+const apiVersion = "v1.44"
 
 // maxBodyBytes bounds a single Engine response. The Engine is trusted, but a
 // wedged one returning an endless body must be a timeout, not an OOM.
