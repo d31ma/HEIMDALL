@@ -175,6 +175,21 @@ export default class InstancePage {
     }
   }
 
+  // availableGroups maps the series fields this target's provider actually
+  // returned onto panel groups. CPU and memory always show — every provider
+  // answers those, and an empty CPU chart during startup is honest.
+  availableGroups() {
+    const series = this.series || {}
+    const has = (field) => (series[field] || []).length > 0
+    const groups = new Set(['cpu', 'memory'])
+    if (has('net_rx_bytes') || has('net_tx_bytes')) groups.add('network')
+    if (has('block_read_bytes') || has('block_write_bytes')) groups.add('block')
+    if (has('pids')) groups.add('pids')
+    if (has('cpu_throttled')) groups.add('throttling')
+    if (has('net_errors')) groups.add('net_errors')
+    return groups
+  }
+
   async paintMetrics() {
     try {
       const answer = await api.metrics(this.project, this.app, this.instanceID, this.service)
@@ -184,7 +199,12 @@ export default class InstancePage {
       // selection re-renders; otherwise the existing charts update in
       // place, no re-render per poll.
       const selection = answer.metrics
-      const chosen = new Set(selection && selection.length ? selection : PANEL_DEFS.map((d) => d.group))
+      // Without an explicit heimdall.metrics selection, the panels are what
+      // the provider actually answered with — a Docker target carries all
+      // ten, CloudWatch-backed targets carry CPU and memory. A panel for a
+      // series this target can never produce is not "Collecting…", it is a
+      // lie with a spinner.
+      const chosen = new Set(selection && selection.length ? selection : this.availableGroups())
       const panels = PANEL_DEFS.filter((definition) => chosen.has(definition.group))
       if (panels.length !== this.panels.length) {
         this.panels = panels
@@ -200,7 +220,7 @@ export default class InstancePage {
 
   async paintLogs() {
     try {
-      const text = await api.logs(this.project, this.app, this.instanceID, 300)
+      const text = await api.logs(this.project, this.app, this.instanceID, this.service, 300)
       this.logsText = text || '(no output)'
       const element = document.getElementById('hd-logs')
       if (!element) return

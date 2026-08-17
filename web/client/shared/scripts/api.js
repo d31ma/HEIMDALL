@@ -92,8 +92,11 @@ export const api = {
     gateway('GET', `/api/v1/projects/${encodeURIComponent(project)}/apps/${encodeURIComponent(app)}/instances`),
   metrics: (project, app, instance, service) =>
     gateway('GET', `/api/v1/projects/${encodeURIComponent(project)}/apps/${encodeURIComponent(app)}/metrics?instance=${encodeURIComponent(instance)}&service=${encodeURIComponent(service)}`),
-  logs: (project, app, instance, tail = 200) =>
-    gateway('GET', `/api/v1/projects/${encodeURIComponent(project)}/apps/${encodeURIComponent(app)}/logs?instance=${encodeURIComponent(instance)}&tail=${tail}`,
+  logs: (project, app, instance, service, tail = 200) =>
+    // service travels with the read: cloud adapters (ECS) reconstruct the
+    // provider-side stream name from it, and an empty service reads a
+    // stream that does not exist.
+    gateway('GET', `/api/v1/projects/${encodeURIComponent(project)}/apps/${encodeURIComponent(app)}/logs?instance=${encodeURIComponent(instance)}&service=${encodeURIComponent(service)}&tail=${tail}`,
       undefined, { raw: true }),
   events: (project, app) =>
     gateway('GET', `/api/v1/projects/${encodeURIComponent(project)}/apps/${encodeURIComponent(app)}/events`),
