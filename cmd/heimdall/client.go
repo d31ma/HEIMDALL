@@ -155,7 +155,7 @@ func call(stored session, method, path string, body, into any) error {
 		if strings.Contains(err.Error(), "certificate") && os.Getenv("HD_CA_FILE") == "" {
 			return fmt.Errorf(
 				"HD0141: %s %s: %w\n\nThe control plane serves its own certificate. "+
-					"Point HD_CA_FILE at <deployment>/keys/agent-ca.crt to trust it.",
+					"Point HD_CA_FILE at <deployment>/keys/agent-ca.crt to trust it",
 				method, path, err)
 		}
 		return fmt.Errorf("HD0123: %s %s: %w", method, path, err)
@@ -170,10 +170,7 @@ func call(stored session, method, path string, body, into any) error {
 	// Decode first, whatever the status. A 409 from a sync carries the whole
 	// operation document, and the caller needs to print the plan and the
 	// per-service failures — not just "conflict".
-	decoded := false
-	if into != nil && json.Unmarshal(raw, into) == nil {
-		decoded = true
-	}
+	decoded := into != nil && json.Unmarshal(raw, into) == nil
 
 	if response.StatusCode >= 400 {
 		var failure struct {

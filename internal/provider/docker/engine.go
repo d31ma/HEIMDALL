@@ -189,18 +189,7 @@ func isNotFound(err error) bool {
 }
 
 func asEngineError(err error, target **engineError) bool {
-	for err != nil {
-		if typed, ok := err.(*engineError); ok {
-			*target = typed
-			return true
-		}
-		unwrapper, ok := err.(interface{ Unwrap() error })
-		if !ok {
-			return false
-		}
-		err = unwrapper.Unwrap()
-	}
-	return false
+	return errors.As(err, target)
 }
 
 // decode reads a JSON response body into out.
@@ -538,7 +527,7 @@ func (s statsSample) blockIO() (read, write uint64) {
 // over one connection with an 8-byte frame header unless the container has a
 // TTY; demuxReader strips those frames so callers get plain text.
 func (e *engine) containerLogs(ctx context.Context, id string, query url.Values) (io.ReadCloser, error) {
-	response, err := e.do(ctx, http.MethodGet, "/containers/"+id+"/logs", query, nil)
+	response, err := e.do(ctx, http.MethodGet, "/containers/"+id+"/logs", query, nil) //nolint:bodyclose // demuxReader owns the body; its Close closes the stream
 	if err != nil {
 		return nil, err
 	}
@@ -845,7 +834,7 @@ func (e *engine) listTasks(ctx context.Context, serviceID string) ([]swarmTask, 
 }
 
 func (e *engine) serviceLogs(ctx context.Context, id string, query url.Values) (io.ReadCloser, error) {
-	response, err := e.do(ctx, http.MethodGet, "/services/"+id+"/logs", query, nil)
+	response, err := e.do(ctx, http.MethodGet, "/services/"+id+"/logs", query, nil) //nolint:bodyclose // demuxReader owns the body; its Close closes the stream
 	if err != nil {
 		return nil, err
 	}

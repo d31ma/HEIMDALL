@@ -355,7 +355,7 @@ func (e *Engine) Status(ctx context.Context, appID string) (diff.Summary, error)
 			summary.Services = append(summary.Services, diff.ServiceDiff{
 				Service: "*", Message: err.Error(),
 			})
-			return summary, nil
+			return summary, nil //nolint:nilerr // a plan-time rejection is the diff's answer, not a failed read
 		}
 	}
 
@@ -530,7 +530,7 @@ func (e *Engine) Sync(ctx context.Context, request Request) (store.Operation, er
 		},
 	})
 
-	applyCtx := ctx
+	var applyCtx context.Context
 	if resolved.remote {
 		applyCtx = dispatch.WithApply(ctx, dispatch.ApplyOptions{Spec: want, Prune: prune})
 	} else {

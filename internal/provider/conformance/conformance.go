@@ -10,6 +10,7 @@ package conformance
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -422,18 +423,7 @@ func changedOperations(plan provider.Plan) []provider.Operation {
 }
 
 func asRejection(err error, target **provider.RejectionError) bool {
-	for err != nil {
-		if typed, ok := err.(*provider.RejectionError); ok {
-			*target = typed
-			return true
-		}
-		unwrapper, ok := err.(interface{ Unwrap() error })
-		if !ok {
-			return false
-		}
-		err = unwrapper.Unwrap()
-	}
-	return false
+	return errors.As(err, target)
 }
 
 // WaitFor polls until condition holds or the deadline passes. Adapters whose

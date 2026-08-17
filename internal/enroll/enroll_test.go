@@ -212,7 +212,8 @@ func TestPinnedConnectionAcceptsTheRealServerAndRefusesAnImpostor(t *testing.T) 
 	}
 	_ = response.Body.Close()
 
-	if _, err := client.Get(serve(impostor).URL); err == nil {
+	if refused, err := client.Get(serve(impostor).URL); err == nil {
+		_ = refused.Body.Close()
 		t.Fatal("the pinned client accepted an impostor presenting a different certificate")
 	}
 }
