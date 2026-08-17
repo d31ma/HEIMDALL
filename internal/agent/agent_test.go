@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -488,18 +489,7 @@ func encodeToken(t *testing.T, fields map[string]any) string {
 }
 
 func asRejection(err error, target **provider.RejectionError) bool {
-	for err != nil {
-		if typed, ok := err.(*provider.RejectionError); ok {
-			*target = typed
-			return true
-		}
-		unwrapper, ok := err.(interface{ Unwrap() error })
-		if !ok {
-			return false
-		}
-		err = unwrapper.Unwrap()
-	}
-	return false
+	return errors.As(err, target)
 }
 
 // TestObservabilityJobsRoundTrip: metrics, logs, and events reach an
