@@ -37,7 +37,7 @@
       "name": "Apache-2.0"
     },
     "title": "HEIMDALL control plane API",
-    "version": "26.34.01"
+    "version": "26.34.01-1"
   },
   "openapi": "3.1.0",
   "paths": {

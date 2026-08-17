@@ -74,6 +74,10 @@ jobs:
         run: cd dist && sha256sum * > checksums.txt && cat checksums.txt
 
       - name: Attest provenance
+        # GitHub artifact attestation is not available to private
+        # repositories on this plan. The release still ships with checksums;
+        # attestation resumes the day the repository goes public.
+        if: ${{ !github.event.repository.private }}
         uses: actions/attest-build-provenance@v1
         with:
           subject-path: dist/heimdall_*
@@ -81,11 +85,18 @@ jobs:
       - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
+          PRIVATE: ${{ github.event.repository.private }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/* \
-            --title "heimdall ${GITHUB_REF_NAME}" \
-            --notes "Binaries are attested; verify with:
+          if [ "$PRIVATE" = "true" ]; then
+            notes="Checksums in \`checksums.txt\`. See CHANGELOG.md for what changed.
+          (Provenance attestation is skipped while this repository is private.)"
+          else
+            notes="Binaries are attested; verify with:
           \`\`\`
           gh attestation verify heimdall_$(cat VERSION)_<os>_<arch> --repo ${GITHUB_REPOSITORY}
           \`\`\`
           Checksums in \`checksums.txt\`. See CHANGELOG.md for what changed."
+          fi
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "heimdall ${GITHUB_REF_NAME}" \
+            --notes "$notes"
