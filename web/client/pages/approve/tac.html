@@ -1,0 +1,14 @@
+<a class="skip" href="#hd-main">Skip to content</a>
+<div class="hd-shell min-h-screen flex flex-col">
+  <header class="hd-bar backdrop-blur-md flex items-center justify-between gap-4 py-4 px-[clamp(1rem,4vw,2rem)] sticky top-0 z-10 border-b border-[var(--w-border,#e3e3e3)] bg-[color-mix(in_srgb,var(--w-surface,#fff)_82%,transparent)]">
+    <div class="hd-brand flex items-center gap-2.5 flex-wrap">
+      <a class="hd-link flex items-center gap-2.5" href="/"><img src="/shared/assets/heimdall-mark.svg" class="w-7 h-7" alt="" aria-hidden="true"> <strong>HEIMDALL</strong></a>
+      <span class="hd-tagline text-[0.9rem] text-[var(--w-text-muted,#666)] max-sm:hidden">Approve a device</span>
+    </div>
+    <div id="hd-identity" class="hd-identity"></div>
+  </header>
+
+  <main id="hd-main" class="hd-main max-w-[76rem] animate-[hd-fade_0.25s_ease-out] w-full mx-auto p-[clamp(1rem,4vw,2rem)] flex-1" aria-busy="true">
+    <p class="hd-muted">Loading…</p>
+  </main>
+</div>

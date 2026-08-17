@@ -1,0 +1,16 @@
+# Deliberately uses directives the cloud adapters cannot express. It renders
+# fine and is rejected at plan time by Capabilities(), which is the behaviour
+# under test — never a silent drop.
+services:
+  worker:
+    image: ghcr.io/example/worker@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    depends_on:
+      - cache
+    volumes:
+      - scratch:/scratch
+    labels:
+      heimdall.wave: "1"
+  cache:
+    image: redis:7.4-alpine
+    ports:
+      - "6379:6379/tcp"

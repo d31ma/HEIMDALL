@@ -1,0 +1,10 @@
+{
+  "name": "heimdall-website",
+  "private": true,
+  "version": "0.0.0",
+  "description": "The HEIMDALL website: Tac pages only, DuVay + Tailwind for UI. The Tailwind binary is borrowed from ../web so the repo installs it once.",
+  "type": "module",
+  "scripts": {
+    "css": "../web/node_modules/.bin/tailwindcss -i client/shared/styles/tailwind.src.css -o client/shared/styles/tailwind.css --minify"
+  }
+}

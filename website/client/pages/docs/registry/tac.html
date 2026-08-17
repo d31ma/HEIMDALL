@@ -1,0 +1,54 @@
+<div class="min-h-screen flex flex-col">
+  <site-header></site-header>
+  <main class="flex-1 max-w-[76rem] w-full mx-auto px-[clamp(1rem,4vw,2.5rem)] py-[clamp(1.5rem,4vw,3rem)] lg:flex lg:gap-10">
+    <docs-sidebar></docs-sidebar>
+    <article id="content" class="docs-article min-w-0 flex-1 max-w-[46rem] animate-[site-fade_0.3s_ease-out] max-lg:mt-6">
+      <h1>The registry in git</h1>
+      <p class="lead">One interactive act binds a root repository; after that, what applications exist is a reviewed commit.</p>
+
+<h2>Bind once</h2>
+<p>The registry follows the same claim as everything else: git is the truth. A tenant binds one <em>root repository</em> — through the web UI's Registry page or <code>POST /api/v1/registry/bind</code> — and that binding is the single interactive act. It can require signed commits, and it carries a <code>prune</code> switch that gates deletion.</p>
+<h2>The manifest</h2>
+<p>The root repository holds <code>registry.yaml</code>, declaring projects, repositories, targets, and applications by name. Unknown fields fail the sync by name; a dangling reference fails before anything is applied.</p>
+<pre class="site-code">projects:
+  - name: shop
+repositories:
+  - project: shop
+    name: site
+    url: ssh://git@forge/shop/site.git
+    default_ref: main
+targets:
+  - project: shop
+    name: local
+    provider: docker
+    endpoint: http://10.0.0.5:2375
+applications:
+  - project: shop
+    name: site
+    repository: site
+    target: local
+    path: deploy
+    sync_policy:
+      automated: true
+      self_heal: true</pre>
+<h2>How a sync behaves</h2>
+<ul>
+<li><strong>Creates and updates</strong> converge the collections on the manifest, in dependency order, and an unchanged manifest makes zero changes.</li>
+<li><strong>Adoption</strong>: a document registered interactively becomes registry-managed when the manifest declares it — visibly, as an update in the sync record.</li>
+<li><strong>Deletion is prune-gated</strong>: with <code>prune</code> off, undeclared managed documents are counted as withheld, never silently removed.</li>
+<li><strong>One record per pass</strong> lands in the operations log with every change named.</li>
+</ul>
+<h2>One authority per document</h2>
+<p>A managed document refuses interactive mutation: editing it through the API answers <code>409 HD0272</code> with the root repository named. The change is a commit — with review, blame, and revert — like every other change to truth. Unbinding keeps the stamps deliberately; rebinding restores the authority.</p>
+<h2>What a manifest can never declare</h2>
+<p>Principals, roles, and grants (authorization is SESAME's), secret values (references only), and agent enrollment (pinned fingerprints only). A compromised root repository can misroute deployments — which its review process exists to catch — but cannot widen anyone's access, read a secret, or enroll an agent.</p>
+<h2>Disaster recovery</h2>
+<p>Restore the deployment directory, bind the root repository, sync. A second control plane pointed at the same root reproduces the same registry.</p>
+    </article>
+  </main>
+  <footer class="border-t border-[var(--w-border,#e3e3e3)]">
+    <div class="max-w-[76rem] mx-auto px-[clamp(1rem,4vw,2.5rem)] py-6 text-[0.85rem] site-muted">
+      HEIMDALL — GitOps for Docker Compose · v26.33.1
+    </div>
+  </footer>
+</div>

@@ -1,0 +1,287 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # HEIMDALL's tests run against real compiled binaries, never fakes. An
+  # authorization test against a stub would happily return "allow" and prove
+  # nothing. These versions are pinned together and upgraded together.
+  SESAME_VERSION: v26.33.02
+  FYLO_VERSION: v26.33.02
+  CHEX_VERSION: latest
+  TACHYON_VERSION: latest
+  # sops and age back the sops/ secret scheme end-to-end tests, installed
+  # through the Go module proxy so the checksum database pins them.
+  SOPS_MODULE: github.com/getsops/sops/v3/cmd/sops@v3.9.4
+  AGE_MODULE: filippo.io/age/cmd/...@v1.2.1
+
+jobs:
+  build:
+    name: Build and test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        # Pinned to the commit TACHYON's CI verified, not a movable tag.
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install FYLO, SESAME, CHEX, and ty
+        run: scripts/install-deps.sh
+
+      - name: Install sops and age for the secret-scheme tests
+        # Without these the SOPS end-to-end tests skip silently, and a CI
+        # that skips the flagship secrets path is not testing it.
+        run: |
+          go install "$SOPS_MODULE"
+          go install "$AGE_MODULE"
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Check formatting
+        run: |
+          unformatted=$(gofmt -l cmd internal)
+          if [ -n "$unformatted" ]; then
+            echo "gofmt needed on:"; echo "$unformatted"; exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test with a coverage floor
+        # -coverpkg makes coverage cross-package, so a handler exercised only
+        # through the reconcile tests still counts. The floor is a ratchet:
+        # measured 63.5% when set, floored at 60 — raise it when it rises,
+        # never lower it to make a build pass.
+        run: |
+          go test -count=1 -coverprofile=coverage.out -coverpkg=./internal/... ./...
+          total=$(go tool cover -func=coverage.out | tail -1 | grep -oE '[0-9.]+' | tail -1)
+          echo "coverage: ${total}%"
+          awk -v t="$total" 'BEGIN { exit (t >= 60.0) ? 0 : 1 }' || {
+            echo "coverage ${total}% is below the 60% floor" >&2
+            exit 1
+          }
+
+      - name: Refuse skipped binary-backed suites
+        # The suites skip politely when a binary is missing, which is right
+        # locally and wrong here: CI exists to run them. A skip on the
+        # runner means the install step regressed.
+        run: |
+          output=$(go test -count=1 ./internal/store/ ./internal/auth/ ./internal/reconcile/ ./internal/registry/ -v 2>&1 | grep -c "SKIP" || true)
+          if [ "$output" -gt 0 ]; then
+            echo "$output test(s) skipped; a required binary is missing from PATH" >&2
+            exit 1
+          fi
+
+      - name: Verify heimdall version ships
+        run: |
+          go build -ldflags "-X main.version=$(cat VERSION)" -o heimdall ./cmd/heimdall
+          ./heimdall version
+          test "$(./heimdall version)" = "heimdall $(cat VERSION)"
+
+  gates:
+    name: Standing gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Run the CI gates
+        run: scripts/ci-gates.sh
+
+  web:
+    name: Web tier
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+
+      # A syntax error in a Tac page or a Yon handler is otherwise found by a
+      # human opening the page, which is the slowest possible feedback loop.
+      - name: Check the JavaScript parses
+        run: |
+          for file in $(find web website -name '*.js' -not -path '*/dist/*' -not -path '*/node_modules/*'); do
+            node --check "$file"
+          done
+
+      - name: Run the gateway tests
+        # node:test, stdlib — no install step, which is the point.
+        run: cd web && npm test
+
+      - name: Check the committed Tailwind sheets are fresh
+        # tailwind.css is generated from tailwind.src.css and committed —
+        # static serving, no build step at runtime. A stale sheet means
+        # someone edited markup without running `npm run css`.
+        run: |
+          cd web && npm ci && npm run css && cd ..
+          cd website && npm run css && cd ..
+          if ! git diff --exit-code -- web/client/shared/styles/tailwind.css website/client/shared/styles/tailwind.css; then
+            echo "the committed tailwind.css is stale; run npm run css in web/ and website/" >&2
+            exit 1
+          fi
+
+      - name: Check the vendored asset is not committed
+        # DuVay is vendored by script rather than committed, so a stray copy
+        # means someone bypassed scripts/vendor-duvay.sh.
+        run: |
+          for dir in web/client/shared/assets/duvay website/client/shared/assets/duvay; do
+            if [ -n "$(git ls-files "$dir")" ]; then
+              echo "$dir is committed; it should be vendored by script" >&2
+              exit 1
+            fi
+          done
+
+  e2e-web:
+    name: Web end-to-end
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+
+      - name: Install FYLO, SESAME, CHEX, and ty
+        run: scripts/install-deps.sh
+
+      - name: Install Playwright
+        run: |
+          cd web
+          npm ci
+          ./node_modules/.bin/playwright install --with-deps chromium-headless-shell
+
+      - name: Vendor DuVay and run the suite
+        # The e2e drives a real control plane, real SESAME, real ty serve,
+        # and a real browser. It is the only place the whole stack meets.
+        run: |
+          scripts/vendor-duvay.sh || echo "DuVay checkout not present; pages will fall back to token defaults"
+          scripts/e2e-web.sh
+
+  website:
+    name: Website
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+
+      - name: Install ty
+        run: scripts/install-deps.sh
+
+      - name: Install Playwright
+        run: |
+          cd web
+          npm ci
+          ./node_modules/.bin/playwright install --with-deps chromium-headless-shell
+
+      - name: Vendor DuVay
+        run: scripts/vendor-duvay.sh || echo "DuVay checkout not present; pages will fall back to token defaults"
+
+      - name: Serve the website and run its suite
+        # The docs are a product surface with a committed test: entities
+        # decoded, sidebar marking, zero overflow at phone width — the
+        # audits that found real defects, kept as gates.
+        run: |
+          (cd website && ty serve --port 9304 --no-watch &)
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:9304/ >/dev/null && break
+            sleep 1
+          done
+          cd web && SITE_URL=http://127.0.0.1:9304 ./node_modules/.bin/playwright test site
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+
+  vulnerabilities:
+    name: govulncheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Scan for known vulnerabilities
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+  licenses:
+    name: License scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Check dependency licences
+        # Apache-2.0 is HEIMDALL's own licence; the allowlist is the set
+        # compatible with redistributing a single binary under it.
+        run: |
+          go install github.com/google/go-licenses@latest
+          go-licenses check ./... \
+            --allowed_licenses=Apache-2.0,MIT,BSD-2-Clause,BSD-3-Clause,ISC

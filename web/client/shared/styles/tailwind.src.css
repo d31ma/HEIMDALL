@@ -1,0 +1,13 @@
+/* Tailwind source for HEIMDALL. `npm run css` compiles this to tailwind.css,
+ * which is committed — the pages are static files served by ty with no
+ * bundler, and a control plane must not fetch its stylesheet from a CDN.
+ *
+ * Only the theme and utilities layers are imported. Preflight is deliberately
+ * absent: DuVay owns the base styles and resets, and Tailwind here supplies
+ * utilities only — motion, elevation, and layout fluidity on top of DuVay's
+ * tokens, never a second colour system. */
+
+@import "tailwindcss/theme" layer(theme);
+@import "tailwindcss/utilities" layer(utilities);
+
+@source "../../";

@@ -1,0 +1,30 @@
+<div class="min-h-screen flex flex-col">
+  <site-header></site-header>
+  <main class="flex-1 max-w-[76rem] w-full mx-auto px-[clamp(1rem,4vw,2.5rem)] py-[clamp(1.5rem,4vw,3rem)] lg:flex lg:gap-10">
+    <docs-sidebar></docs-sidebar>
+    <article id="content" class="docs-article min-w-0 flex-1 max-w-[46rem] animate-[site-fade_0.3s_ease-out] max-lg:mt-6">
+      <h1>Sync, drift and rollback</h1>
+      <p class="lead">The loop that closes the gap — and the levers an operator has over it.</p>
+
+<h2>Sync policies</h2>
+<p>Auto-sync and self-heal are one loop, not two. On each tick the loop reads every consenting application's status; a moved revision syncs under <code>automated</code>, drift under the same revision heals under <code>self_heal</code>. Automated operations record a reason code instead of a principal, so the audit trail says "the policy did this".</p>
+<pre class="site-code">sync_policy:
+  automated: true
+  self_heal: true
+  prune: false</pre>
+<h2>Webhooks — a push is a nudge, not data</h2>
+<p>Point your forge at <code>POST /api/v1/webhooks/&lt;repo-id&gt;</code> with a shared secret (a reference, like every credential). The receiver verifies an HMAC over the raw body and never parses the payload — which branch moved is something the sync finds out by fetching. GitHub, GitLab, Gitea, and a plain <code>curl</code> from CI all work. Nudges are scoped to the pushed repository's applications and run in the loop's own goroutine, so a push storm coalesces instead of stampeding.</p>
+<h2>Plans, dry runs, selective syncs</h2>
+<p>A dry run produces the full plan and applies nothing. A sync can be narrowed to named services; pruning — deleting what the desired state no longer mentions — is always an explicit opt-in, marked in the plan.</p>
+<h2>Rollback</h2>
+<p>A rollback re-applies a stored revision by content, never by ref. It cannot be affected by anything that happened in git since — including a force-push. In-repo (sops) secret ciphertext is pinned by the same commit, so a rollback decrypts exactly what its revision was rendered from.</p>
+<h2>Offline targets park, then drain</h2>
+<p>A sync for a target whose agent is offline parks as a durable pending intent (bounded per target, 24-hour TTL). On reconnect the host runs <em>one</em> fresh sync that re-reads git — an hour of missed commits converges to the newest revision instead of marching through every intermediate one, and superseded intents close pointing at their replacement.</p>
+    </article>
+  </main>
+  <footer class="border-t border-[var(--w-border,#e3e3e3)]">
+    <div class="max-w-[76rem] mx-auto px-[clamp(1rem,4vw,2.5rem)] py-6 text-[0.85rem] site-muted">
+      HEIMDALL — GitOps for Docker Compose · v26.33.1
+    </div>
+  </footer>
+</div>

@@ -1,0 +1,50 @@
+<div class="min-h-screen flex flex-col">
+  <site-header></site-header>
+  <main class="flex-1 max-w-[76rem] w-full mx-auto px-[clamp(1rem,4vw,2.5rem)] py-[clamp(1.5rem,4vw,3rem)] lg:flex lg:gap-10">
+    <docs-sidebar></docs-sidebar>
+    <article id="content" class="docs-article min-w-0 flex-1 max-w-[46rem] animate-[site-fade_0.3s_ease-out] max-lg:mt-6">
+      <h1>Get started</h1>
+      <p class="lead">A control plane on your own machine, deploying a compose repository, in five steps.</p>
+
+<h2>1 · Install the dependencies</h2>
+<p>HEIMDALL supervises three child binaries — FYLO for storage, SESAME for security, CHEX for validation — and drives the real <code>git</code>. The install script fetches the pinned versions; <code>sops</code> and <code>age</code> are optional, for in-repo encrypted secrets.</p>
+<pre class="site-code">scripts/install-deps.sh</pre>
+<h2>2 · Initialise a deployment</h2>
+<p>One directory holds everything — the document root, the security engine's state, and every key. That directory is the backup unit.</p>
+<pre class="site-code">HD_ADMIN_PASSWORD=•••• heimdall init --admin ops
+heimdall serve</pre>
+<h2>3 · Declare your registry in git</h2>
+<p>Open <strong>Registry</strong> in the web UI and bind one root repository — the single interactive act. Its <code>registry.yaml</code> declares the rest: projects, repositories, targets, and applications. Every later change is a commit, with review and rollback for free. See <a href="/docs/registry">The registry in git</a>.</p>
+<pre class="site-code"># registry.yaml, in the root repository
+projects:
+  - name: shop
+repositories:
+  - project: shop
+    name: site
+    url: ssh://git@forge/shop/site.git
+applications:
+  - project: shop
+    name: site
+    repository: site
+    target: local
+    path: deploy
+    sync_policy:
+      automated: true
+      self_heal: true</pre>
+<h2>4 · Reference secrets, never values</h2>
+<p>In your compose file, a secret is a reference resolved at apply time — from a SOPS-encrypted file beside it, a cloud secret manager, or the local sealed store. No value ever enters a stored document. See <a href="/docs/secrets">Secrets</a>.</p>
+<pre class="site-code">services:
+  api:
+    image: ghcr.io/example/api:2.1
+    environment:
+      DATABASE_URL: "$&#123;secret:sops/secrets.enc.yaml#database_url&#125;" </pre>
+<h2>5 · Watch it converge</h2>
+<p>The web UI shows the resource tree, per-instance dashboards with deploy markers, tailing logs, and one Activity table answering "what happened around 14:07". Sync on a webhook nudge or the loop's own tick; drift heals itself if the application consented. See <a href="/docs/sync">Sync, drift and rollback</a> and <a href="/docs/observability">Observability</a>.</p>
+    </article>
+  </main>
+  <footer class="border-t border-[var(--w-border,#e3e3e3)]">
+    <div class="max-w-[76rem] mx-auto px-[clamp(1rem,4vw,2.5rem)] py-6 text-[0.85rem] site-muted">
+      HEIMDALL — GitOps for Docker Compose · v26.33.1
+    </div>
+  </footer>
+</div>

@@ -1,0 +1,32 @@
+{
+  "image": "^[^\\s]+$",
+  "container_name?": "^[a-zA-Z0-9][a-zA-Z0-9_.-]*$",
+  "entrypoint?": ["^.*$"],
+  "command?": ["^.*$"],
+  "environment?": {
+    "^[A-Za-z_][A-Za-z0-9_]*$": "^.*$"
+  },
+  "ports?": ["^([0-9]{1,5}:)?[0-9]{1,5}(/(tcp|udp))?$"],
+  "volumes?": ["^[^\\s:]+:/[^\\s:]*(:ro)?$"],
+  "depends_on?": ["^[a-z][a-z0-9_.-]*$"],
+  "restart?": "^(no|always|on-failure|unless-stopped)$",
+  "healthcheck?": {
+    "test": ["^.*$"],
+    "interval?": "^[0-9]+(ms|s|m|h)$",
+    "timeout?": "^[0-9]+(ms|s|m|h)$",
+    "start_period?": "^[0-9]+(ms|s|m|h)$",
+    "retries?": "^[0-9]+$"
+  },
+  "labels?": {
+    "^[^\\s]+$": "^.*$"
+  },
+  "deploy?": {
+    "replicas?": "^[0-9]+$",
+    "resources?": {
+      "limits?": {
+        "cpus?": "^[0-9]+(\\.[0-9]+)?$",
+        "memory?": "^[0-9]+[KMG]?$"
+      }
+    }
+  }
+}

@@ -1,0 +1,33 @@
+<div class="min-h-screen flex flex-col">
+  <site-header></site-header>
+  <main class="flex-1 max-w-[76rem] w-full mx-auto px-[clamp(1rem,4vw,2.5rem)] py-[clamp(1.5rem,4vw,3rem)] lg:flex lg:gap-10">
+    <docs-sidebar></docs-sidebar>
+    <article id="content" class="docs-article min-w-0 flex-1 max-w-[46rem] animate-[site-fade_0.3s_ease-out] max-lg:mt-6">
+      <h1>Providers and capabilities</h1>
+      <p class="lead">Five runtimes answer one model — and refuse, by name, what they cannot express.</p>
+
+<h2>The adapters</h2>
+<p>Docker Engine, Docker Swarm, Amazon ECS, Google Cloud Run, and Azure Container Apps. Adapters are the only code that knows a cloud exists, they call the cloud SDKs directly (never Docker's deprecated compose integrations), and every adapter passes the same conformance suite.</p>
+<h2>The honest matrix</h2>
+<p>Each adapter's <code>Capabilities()</code> answers what it can and cannot express, the published matrix is generated from those answers so it cannot go stale, and a plan that asks for something rejected fails with the offending service and the alternative named (<code>HD0300</code>). Highlights:</p>
+<table>
+<thead><tr><th scope="col">Capability</th><th scope="col">Engine</th><th scope="col">Swarm</th><th scope="col">ECS</th><th scope="col">Cloud Run</th><th scope="col">ACA</th></tr></thead>
+<tbody>
+<tr><td>Replicas</td><td>rejected — one container per service; use Swarm or a cloud target</td><td>full</td><td>full</td><td>full</td><td>full</td></tr>
+<tr><td>Scale to zero</td><td>rejected</td><td>rejected</td><td>rejected</td><td>full</td><td>full</td></tr>
+<tr><td>Bind mounts</td><td>full</td><td>rejected — a node-local path is a different file on every node</td><td>rejected</td><td>rejected</td><td>rejected</td></tr>
+<tr><td>File secrets</td><td>rejected — no secrets API; use env references</td><td>full, with content-hash rotation</td><td>rejected (future work)</td><td>rejected (future work)</td><td>rejected (future work)</td></tr>
+<tr><td>depends_on</td><td>full</td><td>partial — creation order by wave; task start belongs to the scheduler</td><td>partial</td><td>partial</td><td>partial</td></tr>
+</tbody>
+</table>
+<p>The full generated matrix ships in the repository as <code>api/capabilities.md</code>.</p>
+<h2>Never silently drop</h2>
+<p>The compose parser models a deliberate subset and decodes with unknown-field rejection: a directive HEIMDALL does not model fails by name and line at render time. What a modelled directive <em>means</em> per provider is the capability matrix's job at plan time. Between the two, nothing you wrote can quietly not happen.</p>
+    </article>
+  </main>
+  <footer class="border-t border-[var(--w-border,#e3e3e3)]">
+    <div class="max-w-[76rem] mx-auto px-[clamp(1rem,4vw,2.5rem)] py-6 text-[0.85rem] site-muted">
+      HEIMDALL — GitOps for Docker Compose · v26.33.1
+    </div>
+  </footer>
+</div>

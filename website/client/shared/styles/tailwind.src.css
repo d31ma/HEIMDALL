@@ -1,0 +1,9 @@
+/* Tailwind source for the HEIMDALL website. `npm run css` compiles this to
+ * tailwind.css, which is committed — the site is static files, and a website
+ * for an air-gap-friendly tool should not fetch its stylesheet from a CDN.
+ * Utilities only: DuVay owns the base styles and the tokens. */
+
+@import "../../../../web/node_modules/tailwindcss/theme.css" layer(theme);
+@import "../../../../web/node_modules/tailwindcss/utilities.css" layer(utilities);
+
+@source "../../";

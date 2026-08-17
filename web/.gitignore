@@ -1,0 +1,7 @@
+dist/
+node_modules/
+# Real configuration, including where the control plane is. The example is
+# committed; the live one is not.
+server/data/bff.json
+# Vendored from DUVAY by scripts/vendor-duvay.sh rather than committed.
+client/shared/assets/duvay/

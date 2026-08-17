@@ -1,0 +1,6 @@
+# Smallest thing that is still a real application.
+services:
+  web:
+    image: nginx:1.27.3
+    ports:
+      - "8080:80"

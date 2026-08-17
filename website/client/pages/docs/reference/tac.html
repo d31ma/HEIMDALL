@@ -1,0 +1,53 @@
+<div class="min-h-screen flex flex-col">
+  <site-header></site-header>
+  <main class="flex-1 max-w-[76rem] w-full mx-auto px-[clamp(1rem,4vw,2.5rem)] py-[clamp(1.5rem,4vw,3rem)] lg:flex lg:gap-10">
+    <docs-sidebar></docs-sidebar>
+    <article id="content" class="docs-article min-w-0 flex-1 max-w-[46rem] animate-[site-fade_0.3s_ease-out] max-lg:mt-6">
+      <h1>Reference</h1>
+      <p class="lead">The commands, the environment, and where the contracts live.</p>
+
+<h2>CLI</h2>
+<pre class="site-code">heimdall init      initialise a deployment (--admin creates the first administrator)
+heimdall serve     run the control plane
+heimdall doctor    check the machine and the deployment
+heimdall login     sign the CLI in (--device for a browser-approved flow)
+heimdall app       list | get
+heimdall diff      desired versus live, per service
+heimdall sync      deploy (--dry-run, --services a,b, --revision SHA)
+heimdall enroll    mint an agent enrollment token
+heimdall agent     enroll | run, on the target host
+heimdall secret    set a local sealed secret (value via stdin or HD_SECRET_VALUE)
+heimdall backup    archive the deployment directory (serve stopped)
+heimdall restore   restore it
+heimdall contract  regenerate the OpenAPI description and capability matrix</pre>
+<h2>Environment</h2>
+<table>
+<thead><tr><th scope="col">Variable</th><th scope="col">Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>HD_DEPLOYMENT</code></td><td>deployment directory (default <code>~/.heimdall</code>) — the backup unit</td></tr>
+<tr><td><code>HD_ADDR</code></td><td>listen address (default <code>127.0.0.1:8080</code>)</td></tr>
+<tr><td><code>HD_FYLO_ROOT</code></td><td>document root — block storage only, never a sync filesystem</td></tr>
+<tr><td><code>HD_PUBLIC_URL</code></td><td>the URL agents connect to, bound into enrollment tokens</td></tr>
+<tr><td><code>HD_SYNC_INTERVAL</code></td><td>auto-sync tick (default 1m)</td></tr>
+<tr><td><code>HD_METRICS_RETENTION</code></td><td>rollup retention, 24h–336h (default 25h)</td></tr>
+<tr><td><code>HD_TLS</code></td><td>serve TLS with the deployment's certificate (default true)</td></tr>
+<tr><td><code>HD_ADMIN_PASSWORD</code>, <code>HD_PASSWORD</code>, <code>HD_TOTP</code></td><td>credentials, from the environment so they stay out of shell history</td></tr>
+</tbody>
+</table>
+<h2>Diagnostics</h2>
+<p>Every error carries a stable <code>HD</code> code and actionable text — never parse the prose. Ranges: <code>HD01xx</code> configuration and secrets, <code>HD02xx</code> rendering and reconciliation, <code>HD03xx</code> providers and agents, <code>HD04xx</code> API refusals, <code>HD06xx</code> the web tier.</p>
+<h2>Contracts in the repository</h2>
+<ul>
+<li><code>api/openapi.json</code> — generated from the route table; never hand-edited</li>
+<li><code>api/capabilities.md</code> — the matrix, generated from the adapters' own answers</li>
+<li><code>schemas/</code> — the validation schemas for compose input, the DeploySpec, and the registry manifest</li>
+<li><code>docs/adr/</code> — ten architecture decision records for every expensive-to-reverse choice</li>
+</ul>
+    </article>
+  </main>
+  <footer class="border-t border-[var(--w-border,#e3e3e3)]">
+    <div class="max-w-[76rem] mx-auto px-[clamp(1rem,4vw,2.5rem)] py-6 text-[0.85rem] site-muted">
+      HEIMDALL — GitOps for Docker Compose · v26.33.1
+    </div>
+  </footer>
+</div>

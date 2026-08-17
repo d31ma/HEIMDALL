@@ -1,0 +1,59 @@
+<a class="skip" href="#hd-main">Skip to content</a>
+<div class="hd-shell min-h-screen flex flex-col">
+  <header class="hd-bar backdrop-blur-md flex items-center justify-between gap-4 py-4 px-[clamp(1rem,4vw,2rem)] sticky top-0 z-10 border-b border-[var(--w-border,#e3e3e3)] bg-[color-mix(in_srgb,var(--w-surface,#fff)_82%,transparent)]">
+    <div class="hd-brand flex items-center gap-2.5 flex-wrap">
+      <a class="hd-link flex items-center gap-2.5" href="/"><img src="/shared/assets/heimdall-mark.svg" class="w-7 h-7" alt="" aria-hidden="true"> <strong>HEIMDALL</strong></a>
+      <span id="hd-breadcrumb" class="hd-tagline text-[0.9rem] text-[var(--w-text-muted,#666)] max-sm:hidden"><a class="hd-link" :href="appHref">{project} / {app}</a> / {shortID}</span>
+    </div>
+    <div id="hd-identity" class="hd-identity">
+      <button class="w-btn w-btn-text w-btn--sm" type="button" on:click="signOut()">Sign out</button>
+    </div>
+  </header>
+
+  <!-- The Grafana-shaped dashboard: a stat-tile row answering "is it fine"
+       in five seconds, then titled chart panels, then the log tail full
+       width. Tiles and panels are template loops over fields; the charts
+       and the log tail are imperative islands the class feeds, because the
+       runtime recreates them on every render. -->
+  <main id="hd-main" class="hd-main max-w-[88rem] animate-[hd-fade_0.25s_ease-out] w-full mx-auto p-[clamp(1rem,4vw,2rem)] flex-1" :aria-busy="busy">
+    <if :when="pageError">
+      <div class="w-alert w-alert--color-error" role="alert">{pageError}</div>
+    </if>
+
+    <if :when="loading">
+      <p class="hd-muted">Loading…</p>
+    </if>
+    <else>
+      <div class="hd-head flex items-center justify-between gap-4 flex-wrap mb-4">
+        <h1 class="hd-h1 text-[clamp(1.4rem,3vw,1.9rem)] mt-0 mb-[0.4rem]">{serviceName} <span class="hd-muted">{shortID}</span></h1>
+      </div>
+
+      <if :when="gone">
+        <div class="w-alert w-alert--color-warning" role="alert">This instance is not running right now; showing its recorded history.</div>
+      </if>
+
+      <div class="hd-tiles grid grid-cols-[repeat(auto-fit,minmax(min(10rem,100%),1fr))] gap-[0.8rem] mb-4">
+        <loop :for="tile of tiles">
+          <div class="hd-tile transition-all duration-200 ease-out hover:shadow-md hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:hover:shadow-none border border-[var(--w-border,#ddd)] rounded-lg py-[0.7rem] px-[0.9rem] bg-[var(--w-surface,#fff)] [overflow-wrap:anywhere]">
+            <div class="hd-tile-label text-[0.7rem] uppercase tracking-[0.05em] text-[var(--w-text-muted,#666)] mb-1">{tile.label}</div>
+            <div :class="tile.valueClass">{tile.value}</div>
+          </div>
+        </loop>
+      </div>
+
+      <div class="hd-panels grid grid-cols-[repeat(auto-fit,minmax(min(24rem,100%),1fr))] gap-[0.9rem] mb-4">
+        <loop :for="panel of panels">
+          <section class="hd-panel transition-all duration-200 ease-out hover:shadow-md hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:hover:shadow-none animate-[hd-fade_0.3s_ease-out] border border-[var(--w-border,#ddd)] rounded-lg py-[0.8rem] px-4 bg-[var(--w-surface,#fff)]">
+            <h2 class="hd-panel-title text-[0.85rem] mt-0 mb-2 text-[var(--w-text-muted,#555)]">{panel.title}</h2>
+            <hd-timeseries :id="panel.id"></hd-timeseries>
+          </section>
+        </loop>
+      </div>
+
+      <section class="hd-panel hd-panel--wide col-span-full border border-[var(--w-border,#ddd)] rounded-lg py-[0.8rem] px-4 bg-[var(--w-surface,#fff)]">
+        <h2 class="hd-panel-title text-[0.85rem] mt-0 mb-2 text-[var(--w-text-muted,#555)]">Logs <span class="hd-muted">(tailing)</span></h2>
+        <pre id="hd-logs" class="hd-logs scroll-smooth max-h-80 overflow-auto m-0 py-[0.6rem] px-[0.8rem] rounded-md text-[0.78rem] leading-[1.45] whitespace-pre-wrap [overflow-wrap:anywhere]" aria-live="polite">Loading…</pre>
+      </section>
+    </else>
+  </main>
+</div>

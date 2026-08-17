@@ -1,0 +1,74 @@
+{
+ "schema_version": "^[0-9]+$",
+ "app": "^[a-z][a-z0-9_.-]{0,62}$",
+ "revision": "^[0-9a-f]{7,64}$",
+ "services": [
+  {
+   "name": "^[a-z][a-z0-9_.-]{0,62}$",
+   "image": "^[^\\s]+$",
+   "entrypoint?": [
+    "^.*$"
+   ],
+   "command?": [
+    "^.*$"
+   ],
+   "env?": [
+    {
+     "key": "^[A-Za-z_][A-Za-z0-9_]*$",
+     "value?": "^.*$",
+     "ref?": "^[A-Za-z0-9:/#._-]+$"
+    }
+   ],
+   "ports?": [
+    {
+     "published": "^[0-9]{1,5}$",
+     "target": "^[0-9]{1,5}$",
+     "protocol": "^(tcp|udp)$"
+    }
+   ],
+   "volumes?": [
+    {
+     "source": "^[^\\s]+$",
+     "target": "^/.*$",
+     "read_only?": "^(true|false)$"
+    }
+   ],
+   "depends_on?": [
+    "^[a-z][a-z0-9_.-]*$"
+   ],
+   "healthcheck?": {
+    "test": [
+     "^.*$"
+    ],
+    "interval_ms?": "^[0-9]+$",
+    "timeout_ms?": "^[0-9]+$",
+    "start_period_ms?": "^[0-9]+$",
+    "retries?": "^[0-9]+$"
+   },
+   "resources?": {
+    "cpu_millis?": "^[0-9]+$",
+    "memory_mib?": "^[0-9]+$"
+   },
+   "labels?": [
+    {
+     "key": "^[^\\s]+$",
+     "value": "^.*$"
+    }
+   ],
+   "replicas": "^[0-9]+$",
+   "restart?": "^(no|always|on-failure|unless-stopped)$",
+   "wave": "^-?[0-9]+$",
+   "metrics?": [
+    "^(cpu|memory|network|block|pids|throttling|net_errors)$"
+   ],
+   "secrets?": [
+    {
+     "name": "^[a-z][a-z0-9_.-]{0,62}$",
+     "ref": "^[A-Za-z0-9:/#._-]+$",
+     "target?": "^[^\\s]+$",
+     "content_hint?": "^sha256:[0-9a-f]{12}$"
+    }
+   ]
+  }
+ ]
+}

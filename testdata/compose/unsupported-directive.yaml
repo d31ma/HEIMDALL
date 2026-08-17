@@ -1,0 +1,7 @@
+# Negative fixture: `networks` is not modelled, so validation must fail and
+# name the offending property rather than dropping it.
+services:
+  web:
+    image: nginx:1.27.3
+    networks:
+      - frontend

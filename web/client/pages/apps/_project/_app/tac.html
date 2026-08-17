@@ -1,0 +1,177 @@
+<a class="skip" href="#hd-main">Skip to content</a>
+<div class="hd-shell min-h-screen flex flex-col">
+  <header class="hd-bar backdrop-blur-md flex items-center justify-between gap-4 py-4 px-[clamp(1rem,4vw,2rem)] sticky top-0 z-10 border-b border-[var(--w-border,#e3e3e3)] bg-[color-mix(in_srgb,var(--w-surface,#fff)_82%,transparent)]">
+    <div class="hd-brand flex items-center gap-2.5 flex-wrap">
+      <a class="hd-link flex items-center gap-2.5" href="/"><img src="/shared/assets/heimdall-mark.svg" class="w-7 h-7" alt="" aria-hidden="true"> <strong>HEIMDALL</strong></a>
+      <span id="hd-breadcrumb" class="hd-tagline text-[0.9rem] text-[var(--w-text-muted,#666)] max-sm:hidden">{project} / {app}</span>
+    </div>
+    <div id="hd-identity" class="hd-identity">
+      <button class="w-btn w-btn-text w-btn--sm" type="button" on:click="signOut()">Sign out</button>
+    </div>
+  </header>
+
+  <!-- The view is data: the page class sets fields and asks the runtime to
+       re-render. The one imperative island is <hd-apptree>, an SVG-drawing
+       web component the class re-feeds after every render. -->
+  <main id="hd-main" class="hd-main max-w-[76rem] animate-[hd-fade_0.25s_ease-out] w-full mx-auto p-[clamp(1rem,4vw,2rem)] flex-1" :aria-busy="busy">
+    <if :when="pageError">
+      <div class="w-alert w-alert--color-error" role="alert">{pageError}</div>
+    </if>
+
+    <div class="hd-head flex items-center justify-between gap-4 flex-wrap mb-4">
+      <h1 class="hd-h1 text-[clamp(1.4rem,3vw,1.9rem)] mt-0 mb-[0.4rem]">{app}</h1>
+      <div class="hd-actions flex gap-2 flex-wrap">
+        <button id="hd-dry" class="w-btn w-btn-outlined" type="button" :disabled="acting" on:click="dryRun()">Dry run</button>
+        <button id="hd-sync" class="w-btn w-btn-filled w-btn-primary" type="button" :disabled="acting" on:click="sync()">Sync</button>
+      </div>
+    </div>
+
+    <div id="hd-action">
+    <if :when="action">
+      <div class="w-card hd-result p-4 mb-4">
+        <if :when="action.working">
+          <p class="hd-muted">Working…</p>
+        </if>
+        <else>
+          <h3 class="hd-h3 text-[1rem] m-0">{action.title}</h3>
+          <if :when="action.message"><p class="hd-muted">{action.message}</p></if>
+          <if :when="action.planned">
+            <h4 class="hd-h4 text-[0.9rem] mt-[0.8rem] mb-[0.3rem]">Planned</h4>
+            <ul class="hd-list mt-[0.2rem] mb-0 pl-[1.2rem]">
+              <loop :for="step of action.planned">
+                <li><code>{step.kind}</code> {step.service} <span class="hd-muted">{step.reason}</span></li>
+              </loop>
+            </ul>
+          </if>
+          <if :when="action.applied">
+            <h4 class="hd-h4 text-[0.9rem] mt-[0.8rem] mb-[0.3rem]">Applied</h4>
+            <ul class="hd-list mt-[0.2rem] mb-0 pl-[1.2rem]">
+              <loop :for="step of action.applied">
+                <li><code>{step.kind}</code> {step.service}</li>
+              </loop>
+            </ul>
+          </if>
+          <if :when="action.failures">
+            <h4 class="hd-h4 text-[0.9rem] mt-[0.8rem] mb-[0.3rem]">Failed</h4>
+            <ul class="hd-list hd-failures mt-[0.2rem] mb-0 pl-[1.2rem]">
+              <loop :for="failure of action.failures">
+                <li><strong>{failure.service}</strong> {failure.reason}</li>
+              </loop>
+            </ul>
+          </if>
+        </else>
+      </div>
+    </if>
+    </div>
+
+    <if :when="loading">
+      <p class="hd-muted">Reading live state…</p>
+    </if>
+
+    <if :when="status">
+      <section class="hd-status flex gap-4 items-center flex-wrap py-4">
+        <div class="hd-chips flex gap-[0.4rem] flex-wrap">
+          <loop :for="chip of status.chips">
+            <span :class="chip.chipClass">{chip.label}</span>
+          </loop>
+        </div>
+        <dl class="hd-facts flex gap-6 max-sm:gap-4 flex-wrap m-0">
+          <div class="flex flex-col gap-[0.15rem]"><dt class="text-[0.75rem] uppercase tracking-[0.04em] text-[var(--w-text-muted,#666)]">Desired</dt><dd class="m-0"><code>{status.desired}</code></dd></div>
+          <div class="flex flex-col gap-[0.15rem]"><dt class="text-[0.75rem] uppercase tracking-[0.04em] text-[var(--w-text-muted,#666)]">Live</dt><dd class="m-0"><code>{status.live}</code></dd></div>
+          <div class="flex flex-col gap-[0.15rem]"><dt class="text-[0.75rem] uppercase tracking-[0.04em] text-[var(--w-text-muted,#666)]">Target</dt><dd class="hd-muted m-0">{status.target}</dd></div>
+        </dl>
+      </section>
+
+      <section class="hd-section mb-[1.6rem]">
+        <h2 class="hd-h2 text-[1.15rem] mt-[1.6rem] mb-[0.6rem]">Instances</h2>
+        <if :when="noInstances">
+          <p class="hd-muted">Nothing is running</p>
+        </if>
+        <div class="hd-toolbar flex items-center justify-between gap-4 flex-wrap mb-[0.8rem]">
+          <div class="hd-viewswitch flex gap-[0.35rem]" role="tablist" aria-label="view">
+            <button id="hd-view-tree" role="tab" :aria-selected="view === 'tree' ? 'true' : 'false'" aria-controls="hd-view-tree-panel"
+              :class="view === 'tree' ? 'w-btn w-btn--sm w-btn-filled w-btn-primary' : 'w-btn w-btn--sm w-btn-outlined'"
+              on:click="switchView('tree')">Tree</button>
+            <button id="hd-view-table" role="tab" :aria-selected="view === 'table' ? 'true' : 'false'" aria-controls="hd-view-table-panel"
+              :class="view === 'table' ? 'w-btn w-btn--sm w-btn-filled w-btn-primary' : 'w-btn w-btn--sm w-btn-outlined'"
+              on:click="switchView('table')">Table</button>
+          </div>
+          <input id="hd-tree-search" class="hd-search transition-[box-shadow,border-color] duration-200 focus:shadow-md py-2 px-3 rounded-md min-w-64 max-sm:min-w-0 max-sm:w-full border border-[var(--w-border,#999)] bg-[var(--w-surface,#fff)] text-base focus-visible:outline-2 focus-visible:outline-[var(--w-primary,#3b5bdb)] focus-visible:outline-offset-2" type="search"
+            placeholder="Filter services and instances…" aria-label="filter resources" :value="term" on:input="filter($event)">
+        </div>
+        <div id="hd-view-tree-panel" role="tabpanel" aria-labelledby="hd-view-tree" :hidden="view !== 'tree'">
+          <hd-apptree id="hd-apptree"></hd-apptree>
+        </div>
+        <div id="hd-view-table-panel" role="tabpanel" aria-labelledby="hd-view-table" :hidden="view !== 'table'">
+          <div class="hd-scroll">
+            <table class="w-table w-table--dense">
+              <thead><tr><th>Service</th><th>Health</th><th>State</th><th>Revision</th><th>Restarts</th><th>Started</th></tr></thead>
+              <tbody>
+                <loop :for="instance of visibleInstances">
+                  <tr class="hd-instance-row transition-colors duration-150" tabindex="0" role="link"
+                      :data-href="instance.href" :aria-label="instance.ariaLabel"
+                      on:click="openRow($event)" on:keydown="rowKey($event)">
+                    <td>{instance.service}</td>
+                    <td><span :class="instance.chipClass">{instance.health}</span></td>
+                    <td class="hd-muted">{instance.status}</td>
+                    <td><code>{instance.revision}</code></td>
+                    <td class="hd-muted">{instance.restarts}</td>
+                    <td class="hd-muted hd-when whitespace-nowrap">{instance.started}</td>
+                  </tr>
+                </loop>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="hd-section mb-[1.6rem]">
+        <h2 class="hd-h2 text-[1.15rem] mt-[1.6rem] mb-[0.6rem]">Activity</h2>
+        <div class="hd-scroll">
+          <table class="w-table w-table--dense">
+            <thead><tr><th>When</th><th>Source</th><th>What</th><th>Phase</th><th>Revision</th><th>Principal</th><th></th></tr></thead>
+            <tbody>
+              <if :when="noActivity">
+                <tr><td colspan="7" class="hd-muted">Nothing yet</td></tr>
+              </if>
+              <loop :for="entry of activityRows">
+                <tr>
+                  <td class="hd-muted hd-when whitespace-nowrap">{entry.when}</td>
+                  <td><span :class="entry.sourceChipClass">{entry.source}</span></td>
+                  <td>{entry.kind}</td>
+                  <td><if :when="entry.phase"><span :class="entry.phaseChipClass">{entry.phase}</span></if></td>
+                  <td><code>{entry.revision}</code></td>
+                  <td class="hd-muted"><if :when="entry.principalShort"><span class="hd-id cursor-help" :title="entry.principal">{entry.principalShort}…</span></if></td>
+                  <td class="hd-muted">{entry.detail}</td>
+                </tr>
+              </loop>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="hd-rollback flex gap-[0.6rem] items-end flex-wrap mt-[0.8rem]">
+          <label class="hd-field max-w-full flex flex-col gap-1 text-[0.9rem]">
+            <span>Roll back to a stored revision</span>
+            <select id="hd-revision" class="max-w-full py-[0.55rem] px-[0.7rem] rounded-md border border-[var(--w-border,#999)] bg-[var(--w-surface,#fff)] text-base focus-visible:outline-2 focus-visible:outline-[var(--w-primary,#3b5bdb)] focus-visible:outline-offset-2" on:change="pickRevision($event)">
+              <if :when="noRevisions"><option value="">No stored revisions</option></if>
+              <loop :for="option of revisionOptions">
+                <option :value="option.value" :selected="option.value === pickedRevision">{option.label}</option>
+              </loop>
+            </select>
+          </label>
+          <if :when="rollbackArmed">
+            <button id="hd-rollback-confirm" class="w-btn w-btn-filled w-btn-warning" type="button" on:click="rollbackConfirm()">Confirm roll back</button>
+            <button id="hd-rollback-cancel" class="w-btn w-btn-text" type="button" on:click="rollbackCancel()">Cancel</button>
+          </if>
+          <else>
+            <button id="hd-rollback" class="w-btn w-btn-outlined w-btn-warning" type="button" :disabled="noRevisions" on:click="rollbackArm()">Roll back</button>
+          </else>
+          <p class="hd-muted hd-note basis-full text-[0.8rem] mt-[0.3rem] mb-0">
+            A rollback re-applies a stored revision. It never re-reads git, so a force-push
+            cannot change what rolling back means.
+          </p>
+        </div>
+      </section>
+    </if>
+  </main>
+</div>

@@ -1,0 +1,119 @@
+<a class="skip" href="#hd-main">Skip to content</a>
+<div class="hd-shell min-h-screen flex flex-col">
+  <header class="hd-bar backdrop-blur-md flex items-center justify-between gap-4 py-4 px-[clamp(1rem,4vw,2rem)] sticky top-0 z-10 border-b border-[var(--w-border,#e3e3e3)] bg-[color-mix(in_srgb,var(--w-surface,#fff)_82%,transparent)]">
+    <div class="hd-brand flex items-center gap-2.5 flex-wrap">
+      <a class="hd-link flex items-center gap-2.5" href="/"><img src="/shared/assets/heimdall-mark.svg" class="w-7 h-7" alt="" aria-hidden="true"> <strong>HEIMDALL</strong></a>
+      <span class="hd-tagline text-[0.9rem] text-[var(--w-text-muted,#666)] max-sm:hidden">Registry</span>
+    </div>
+    <div id="hd-identity" class="hd-identity">
+      <button class="w-btn w-btn-text w-btn--sm" type="button" on:click="signOut()">Sign out</button>
+    </div>
+  </header>
+
+  <!-- ADR 0010's whole interactive surface, as a page: bind the root
+       repository, watch it converge, ask for a sync. Everything else the
+       registry contains is a commit. -->
+  <main id="hd-main" class="hd-main max-w-[76rem] animate-[hd-fade_0.25s_ease-out] w-full mx-auto p-[clamp(1rem,4vw,2rem)] flex-1" :aria-busy="busy">
+    <div class="hd-head flex items-center justify-between gap-4 flex-wrap mb-4">
+      <h1 class="hd-h1 text-[clamp(1.4rem,3vw,1.9rem)] mt-0 mb-[0.4rem]">Registry</h1>
+      <if :when="bound">
+        <div class="hd-actions flex gap-2 flex-wrap">
+          <button id="hd-registry-sync" class="w-btn w-btn-filled w-btn-primary" type="button" :disabled="working" on:click="syncNow()">Sync now</button>
+        </div>
+      </if>
+    </div>
+
+    <if :when="pageError">
+      <div class="w-alert w-alert--color-error" role="alert">{pageError}</div>
+    </if>
+
+    <if :when="view === 'loading'">
+      <p class="hd-muted">Loading…</p>
+    </if>
+
+    <if :when="view === 'unbound'">
+      <section class="hd-section mb-[1.6rem]">
+        <p class="hd-muted">
+          No root repository is bound. Binding one is the single interactive act —
+          after it, projects, repositories, targets, and applications are declared
+          in the repository's <code>registry.yaml</code> and every change is a commit.
+        </p>
+        <form id="hd-bind" class="w-card hd-login p-[1.6rem] w-[min(34rem,100%)] flex flex-col gap-[0.8rem]" novalidate on:submit="bind($event)">
+          <h2 class="hd-h2 text-[1.15rem] mt-0 mb-[0.6rem]">Bind a root repository</h2>
+          <label class="hd-field flex flex-col gap-1 text-[0.9rem]">
+            <span>Repository URL</span>
+            <input id="hd-root-url" class="py-[0.55rem] px-[0.7rem] rounded-md border border-[var(--w-border,#999)] bg-[var(--w-surface,#fff)] text-base focus-visible:outline-2 focus-visible:outline-[var(--w-primary,#3b5bdb)] focus-visible:outline-offset-2" required spellcheck="false" placeholder="ssh://git@forge/infra/root.git">
+          </label>
+          <label class="hd-field flex flex-col gap-1 text-[0.9rem]">
+            <span>Ref <span class="hd-muted">(empty for the default branch)</span></span>
+            <input id="hd-root-ref" class="py-[0.55rem] px-[0.7rem] rounded-md border border-[var(--w-border,#999)] bg-[var(--w-surface,#fff)] text-base focus-visible:outline-2 focus-visible:outline-[var(--w-primary,#3b5bdb)] focus-visible:outline-offset-2" spellcheck="false" placeholder="main">
+          </label>
+          <label class="hd-field flex flex-col gap-1 text-[0.9rem]">
+            <span>Path <span class="hd-muted">(directory holding registry.yaml)</span></span>
+            <input id="hd-root-path" class="py-[0.55rem] px-[0.7rem] rounded-md border border-[var(--w-border,#999)] bg-[var(--w-surface,#fff)] text-base focus-visible:outline-2 focus-visible:outline-[var(--w-primary,#3b5bdb)] focus-visible:outline-offset-2" spellcheck="false" placeholder="">
+          </label>
+          <label class="hd-field flex-row items-center gap-2 text-[0.9rem]">
+            <input id="hd-root-prune" type="checkbox"> <span>Allow the sync to delete what the manifest no longer declares</span>
+          </label>
+          <label class="hd-field flex-row items-center gap-2 text-[0.9rem]">
+            <input id="hd-root-signed" type="checkbox"> <span>Require signed commits</span>
+          </label>
+          <button class="w-btn w-btn-filled w-btn-primary" type="submit" :disabled="working">Bind</button>
+        </form>
+      </section>
+    </if>
+
+    <if :when="bound">
+      <section class="hd-status flex gap-4 items-center flex-wrap py-4">
+        <dl class="hd-facts flex gap-6 max-sm:gap-4 flex-wrap m-0">
+          <div class="flex flex-col gap-[0.15rem]"><dt class="text-[0.75rem] uppercase tracking-[0.04em] text-[var(--w-text-muted,#666)]">Root repository</dt><dd class="m-0"><code>{binding.url}</code></dd></div>
+          <div class="flex flex-col gap-[0.15rem]"><dt class="text-[0.75rem] uppercase tracking-[0.04em] text-[var(--w-text-muted,#666)]">Ref</dt><dd class="m-0">{binding.refLabel}</dd></div>
+          <div class="flex flex-col gap-[0.15rem]"><dt class="text-[0.75rem] uppercase tracking-[0.04em] text-[var(--w-text-muted,#666)]">Path</dt><dd class="m-0">{binding.pathLabel}</dd></div>
+          <div class="flex flex-col gap-[0.15rem]"><dt class="text-[0.75rem] uppercase tracking-[0.04em] text-[var(--w-text-muted,#666)]">Prune</dt><dd class="m-0">{binding.pruneLabel}</dd></div>
+          <div class="flex flex-col gap-[0.15rem]"><dt class="text-[0.75rem] uppercase tracking-[0.04em] text-[var(--w-text-muted,#666)]">Signatures</dt><dd class="m-0">{binding.signedLabel}</dd></div>
+          <div class="flex flex-col gap-[0.15rem]"><dt class="text-[0.75rem] uppercase tracking-[0.04em] text-[var(--w-text-muted,#666)]">Bound</dt><dd class="hd-muted m-0">{binding.boundLabel}</dd></div>
+        </dl>
+      </section>
+
+      <section class="hd-section mb-[1.6rem]">
+        <h2 class="hd-h2 text-[1.15rem] mt-[1.6rem] mb-[0.6rem]">Syncs</h2>
+        <div class="hd-scroll">
+          <table class="w-table w-table--dense">
+            <thead><tr><th>When</th><th>Phase</th><th>Commit</th><th>What happened</th><th>Changes</th></tr></thead>
+            <tbody>
+              <if :when="noSyncs">
+                <tr><td colspan="5" class="hd-muted">No registry sync has run yet</td></tr>
+              </if>
+              <loop :for="entry of syncs">
+                <tr>
+                  <td class="hd-muted hd-when whitespace-nowrap">{entry.when}</td>
+                  <td><span :class="entry.phaseChipClass">{entry.phase}</span></td>
+                  <td><code>{entry.commit}</code></td>
+                  <td class="hd-muted">{entry.message}</td>
+                  <td class="hd-muted">{entry.changes}</td>
+                </tr>
+              </loop>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="hd-section mb-[1.6rem]">
+        <div class="hd-rollback flex gap-[0.6rem] items-end flex-wrap mt-[0.8rem]">
+          <if :when="unbindArmed">
+            <button class="w-btn w-btn-filled w-btn-warning" type="button" on:click="unbindConfirm()">Confirm unbind</button>
+            <button class="w-btn w-btn-text" type="button" on:click="unbindCancel()">Cancel</button>
+          </if>
+          <else>
+            <button id="hd-unbind" class="w-btn w-btn-outlined w-btn-warning" type="button" on:click="unbindArm()">Unbind</button>
+          </else>
+          <p class="hd-muted hd-note basis-full text-[0.8rem] mt-[0.3rem] mb-0">
+            Unbinding stops the registry loop. Managed documents stay managed —
+            rebinding restores the authority; nothing is silently handed back to
+            interactive mutation.
+          </p>
+        </div>
+      </section>
+    </if>
+  </main>
+</div>

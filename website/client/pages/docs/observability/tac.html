@@ -1,0 +1,31 @@
+<div class="min-h-screen flex flex-col">
+  <site-header></site-header>
+  <main class="flex-1 max-w-[76rem] w-full mx-auto px-[clamp(1rem,4vw,2.5rem)] py-[clamp(1.5rem,4vw,3rem)] lg:flex lg:gap-10">
+    <docs-sidebar></docs-sidebar>
+    <article id="content" class="docs-article min-w-0 flex-1 max-w-[46rem] animate-[site-fade_0.3s_ease-out] max-lg:mt-6">
+      <h1>Observability</h1>
+      <p class="lead">The screens an operator lives in during an incident — without building another metrics database.</p>
+
+<h2>The application view</h2>
+<p>An ArgoCD-style resource tree — application, services in dependency order, running instances — with health on every node, a table twin, a search that filters both, and one Activity table merging HEIMDALL's operations with the runtime's own events, because "what happened around 14:07" is one question.</p>
+<h2>Instance dashboards</h2>
+<p>Every instance gets a Grafana-style page: stat tiles (health, state, restarts, started, revision, image), chart panels — CPU, memory, memory-of-limit, network, block I/O, PIDs, CPU throttling, network errors — with deploy markers drawn where revisions landed, and the tailing log underneath.</p>
+<h2>Choosing what to collect</h2>
+<p>A service declares which metric groups its dashboards carry, in the compose file. Unchosen panels are absent, not empty; a typo is rejected at render with the vocabulary named:</p>
+<pre class="site-code">services:
+  web:
+    labels:
+      heimdall.metrics: "cpu, memory, network"
+# vocabulary: cpu, memory, network, block, pids, throttling, net_errors</pre>
+<h2>Retention</h2>
+<p>Docker Engine metrics flow scrape → in-memory ring (one hour) → one small rollup document per instance-minute, kept 25 hours by default. <code>HD_METRICS_RETENTION</code> extends that up to 336h; a bad value fails startup loudly, because the alternative is a week of history silently pruned to a day. Past two weeks, the honest tool is a real time-series database — which HEIMDALL deliberately is not: provider-native metrics stores answer for the clouds.</p>
+<h2>Logs</h2>
+<p>Logs stream from the runtime and are never stored — a log store is another product, and an unstored log is one a secret cannot leak into. Retention is your logging driver's or your cloud's setting. There is deliberately no interactive container shell: streaming logs only.</p>
+    </article>
+  </main>
+  <footer class="border-t border-[var(--w-border,#e3e3e3)]">
+    <div class="max-w-[76rem] mx-auto px-[clamp(1rem,4vw,2.5rem)] py-6 text-[0.85rem] site-muted">
+      HEIMDALL — GitOps for Docker Compose · v26.33.1
+    </div>
+  </footer>
+</div>

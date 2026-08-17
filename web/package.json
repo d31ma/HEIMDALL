@@ -1,0 +1,17 @@
+{
+  "name": "heimdall-web",
+  "private": true,
+  "version": "0.0.0",
+  "description": "HEIMDALL web tier: a Tac interface and a session-aware Yon proxy in front of the control-plane API.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "test": "node --test $(find tests -name '*.test.js')",
+    "css": "tailwindcss -i client/shared/styles/tailwind.src.css -o client/shared/styles/tailwind.css --minify"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.60.0",
+    "@tailwindcss/cli": "^4.3.3",
+    "tailwindcss": "^4.3.3"
+  }
+}

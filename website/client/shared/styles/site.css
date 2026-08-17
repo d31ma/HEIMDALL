@@ -1,0 +1,93 @@
+/* The website's layer over DuVay — the same contract the product's own UI
+ * uses: DuVay in a layer below Tailwind's utilities so a utility in the
+ * markup reliably wins, this file unlayered and outranking both, and every
+ * colour a DuVay token so the themes work. */
+
+@layer duvay, properties, theme, utilities;
+@import url("/shared/assets/duvay/duvay.min.css") layer(duvay);
+@import url("/shared/styles/tailwind.css");
+
+/* Brand: the primary is Heimdallr's amber, the mark's own palette. */
+:root, [w-theme="light"] { --w-primary: #b45309; }
+[w-theme="dark"] { --w-primary: #f5a623; }
+@media (prefers-color-scheme: dark) {
+  [w-theme="auto"] { --w-primary: #f5a623; }
+}
+
+body {
+  margin: 0;
+  background: var(--w-surface, #fff);
+  color: var(--w-text, #111);
+  font-family: var(--w-font-family, system-ui, sans-serif);
+}
+
+.site-muted { color: var(--w-text-muted, #666); }
+.site-link { color: var(--w-primary, #b45309); }
+/* Code samples are a terminal, and a terminal is dark in every theme —
+ * fixed colours on purpose. The first version used a DuVay surface token
+ * here, which resolves *light* in the light theme and put near-white text
+ * on near-white ground: a 1.05:1 contrast ratio. */
+.site-code {
+  display: block; padding: 0.9rem 1.1rem; border-radius: 0.5rem; overflow-x: auto;
+  background: #15181a;
+  color: #e8e6e3;
+  border: 1px solid #2a2f33;
+  font-family: var(--w-font-family-mono, ui-monospace, monospace);
+  font-size: 0.85rem; line-height: 1.6;
+}
+
+/* Anchor targets clear the sticky header instead of hiding under it. */
+[id] { scroll-margin-top: 5.5rem; }
+
+/* Keyboard focus is visible on everything interactive. */
+a:focus-visible, .w-btn:focus-visible {
+  outline: 2px solid var(--w-primary, #b45309); outline-offset: 2px;
+}
+.w-btn, .w-chip { border-radius: 0.45rem; }
+
+/* The skip link is the first tab stop, invisible until focused. */
+.skip {
+  position: absolute; left: 0.75rem; top: 0.75rem; z-index: 50;
+  transform: translateY(-300%);
+  background: var(--w-primary, #b45309); color: #fff;
+  padding: 0.5rem 0.9rem; border-radius: 0.45rem; text-decoration: none;
+}
+.skip:focus-visible { transform: none; }
+
+@keyframes site-fade {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* Documentation article typography: element rules scoped to the article,
+ * because classing every paragraph of ten pages would drown the markup. */
+.docs-article h1 { font-size: clamp(1.7rem, 3.5vw, 2.2rem); margin: 0 0 0.5rem; font-weight: 700; }
+.docs-article .lead { color: var(--w-text-muted, #666); margin: 0 0 2rem; font-size: 1.02rem; }
+.docs-article h2 { font-size: 1.3rem; margin: 2.4rem 0 0.6rem; font-weight: 700; }
+.docs-article h3 { font-size: 1.05rem; margin: 1.6rem 0 0.4rem; font-weight: 650; }
+.docs-article p, .docs-article li { font-size: 0.95rem; line-height: 1.7; }
+.docs-article ul { padding-left: 1.3rem; }
+.docs-article code {
+  background: color-mix(in srgb, var(--w-primary, #b45309) 8%, var(--w-surface, #fff));
+  padding: 0.1em 0.35em; border-radius: 0.3em; font-size: 0.86em;
+  font-family: var(--w-font-family-mono, ui-monospace, monospace);
+}
+.docs-article .site-code { margin: 0.8rem 0 1.2rem; }
+.docs-article .site-code code { background: none; padding: 0; font-size: inherit; }
+/* A wide table scrolls inside its own box on a phone rather than pushing
+ * the page sideways — the same rule the product UI follows. */
+.docs-article table {
+  display: block; overflow-x: auto; max-width: 100%;
+  border-collapse: collapse; font-size: 0.9rem; margin: 0.8rem 0 1.2rem;
+}
+.docs-article table tbody, .docs-article table thead { min-width: 100%; }
+.docs-article th, .docs-article td {
+  text-align: left; padding: 0.45rem 0.6rem; vertical-align: top;
+  border-bottom: 1px solid var(--w-border, #e3e3e3);
+}
+.docs-article th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--w-text-muted, #666); }
+.docs-article a { color: var(--w-primary, #b45309); }

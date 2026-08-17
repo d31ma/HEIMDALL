@@ -1,0 +1,96 @@
+<a class="skip" href="#hd-main">Skip to content</a>
+<div class="hd-shell min-h-screen flex flex-col">
+  <header class="hd-bar backdrop-blur-md flex items-center justify-between gap-4 py-4 px-[clamp(1rem,4vw,2rem)] sticky top-0 z-10 border-b border-[var(--w-border,#e3e3e3)] bg-[color-mix(in_srgb,var(--w-surface,#fff)_82%,transparent)]">
+    <div class="hd-brand flex items-center gap-2.5 flex-wrap">
+      <img src="/shared/assets/heimdall-mark.svg" class="w-7 h-7" alt="" aria-hidden="true">
+      <strong>HEIMDALL</strong>
+      <span class="hd-tagline text-[0.9rem] text-[var(--w-text-muted,#666)] max-sm:hidden">GitOps for Docker Compose</span>
+    </div>
+    <div id="hd-identity" class="hd-identity">
+      <if :when="signedIn">
+        <button class="w-btn w-btn--flat w-btn--sm" type="button" on:click="signOut()">Sign out</button>
+      </if>
+    </div>
+  </header>
+
+  <!-- The view is data: the page class sets `view` and fields, then asks the
+       runtime to re-render. Markup lives here; the script holds no HTML. -->
+  <main id="hd-main" class="hd-main max-w-[76rem] animate-[hd-fade_0.25s_ease-out] w-full mx-auto p-[clamp(1rem,4vw,2rem)] flex-1" :aria-busy="busy">
+    <if :when="pageError">
+      <div class="w-alert w-alert--color-error" role="alert">{pageError}</div>
+    </if>
+
+    <if :when="view === 'loading'">
+      <p class="hd-muted">Loading…</p>
+    </if>
+
+    <if :when="view === 'login'">
+      <section class="hd-centre flex justify-center pt-12">
+        <form id="hd-login" class="w-card hd-login p-[1.6rem] w-[min(26rem,100%)] flex flex-col gap-[0.8rem]" novalidate on:submit="signIn($event)">
+          <h1 class="hd-h1 text-[clamp(1.4rem,3vw,1.9rem)] mt-0 mb-[0.4rem]">Sign in</h1>
+          <p class="hd-muted">HEIMDALL does not store your password. It is verified by SESAME.</p>
+          <div id="hd-login-error" role="alert">
+            <if :when="loginError">
+              <div class="w-alert w-alert--color-error">{loginError}</div>
+            </if>
+          </div>
+          <label class="hd-field flex flex-col gap-1 text-[0.9rem]">
+            <span>Username</span>
+            <input id="hd-user" class="py-[0.55rem] px-[0.7rem] rounded-md border border-[var(--w-border,#999)] bg-[var(--w-surface,#fff)] text-base focus-visible:outline-2 focus-visible:outline-[var(--w-primary,#3b5bdb)] focus-visible:outline-offset-2" name="username" autocomplete="username" required autofocus :value="identifier">
+          </label>
+          <label class="hd-field flex flex-col gap-1 text-[0.9rem]">
+            <span>Password</span>
+            <input id="hd-password" class="py-[0.55rem] px-[0.7rem] rounded-md border border-[var(--w-border,#999)] bg-[var(--w-surface,#fff)] text-base focus-visible:outline-2 focus-visible:outline-[var(--w-primary,#3b5bdb)] focus-visible:outline-offset-2" name="password" type="password" autocomplete="current-password" required>
+          </label>
+          <label class="hd-field flex flex-col gap-1 text-[0.9rem]">
+            <span>Authenticator code <span class="hd-muted">(if enrolled)</span></span>
+            <input id="hd-totp" class="py-[0.55rem] px-[0.7rem] rounded-md border border-[var(--w-border,#999)] bg-[var(--w-surface,#fff)] text-base focus-visible:outline-2 focus-visible:outline-[var(--w-primary,#3b5bdb)] focus-visible:outline-offset-2" name="totp" inputmode="numeric" autocomplete="one-time-code">
+          </label>
+          <button class="w-btn w-btn-filled w-btn-primary" type="submit" :disabled="signingIn">Sign in</button>
+          <a class="hd-link" href="/audit-login">one-click demo sign-in</a>
+        </form>
+      </section>
+    </if>
+
+    <if :when="view === 'empty'">
+      <section class="hd-empty text-center pt-12">
+        <h1 class="hd-h1 text-[clamp(1.4rem,3vw,1.9rem)] mt-0 mb-[0.4rem]">No applications yet</h1>
+        <p class="hd-muted">Bind a root repository and declare everything in git — or register interactively:</p>
+        <p><a class="hd-link" href="/registry">Bind a registry</a></p>
+        <pre class="hd-code">heimdall app list --project alpha</pre>
+      </section>
+    </if>
+
+    <if :when="view === 'list'">
+      <div class="hd-head flex items-center justify-between gap-4 flex-wrap mb-4">
+        <h1 class="hd-h1 text-[clamp(1.4rem,3vw,1.9rem)] mt-0 mb-[0.4rem]">Applications</h1>
+        <a class="hd-link" href="/registry">Registry</a>
+        <input id="hd-app-search" class="hd-search transition-[box-shadow,border-color] duration-200 focus:shadow-md py-2 px-3 rounded-md min-w-64 max-sm:min-w-0 max-sm:w-full border border-[var(--w-border,#999)] bg-[var(--w-surface,#fff)] text-base focus-visible:outline-2 focus-visible:outline-[var(--w-primary,#3b5bdb)] focus-visible:outline-offset-2" type="search"
+          placeholder="Search applications…" aria-label="search applications" :value="term" on:input="filter($event)">
+      </div>
+      <loop :for="project of visibleProjects">
+        <section class="hd-section mb-[1.6rem]">
+          <h2 class="hd-h2 text-[1.15rem] mt-[1.6rem] mb-[0.6rem]">{project.name}</h2>
+          <div class="hd-scroll">
+            <table class="w-table w-table--dense">
+              <thead><tr><th>Application</th><th>Path</th><th>Ref</th><th></th></tr></thead>
+              <tbody>
+                <if :when="project.empty">
+                  <tr><td colspan="4" class="hd-muted">No applications</td></tr>
+                </if>
+                <loop :for="application of project.applications">
+                  <tr class="transition-colors duration-150 hover:bg-[color-mix(in_srgb,var(--w-primary,#3b5bdb)_6%,transparent)]">
+                    <td><a class="hd-link" :href="application.href">{application.name}</a></td>
+                    <td class="hd-muted">{application.path}</td>
+                    <td class="hd-muted">{application.ref}</td>
+                    <td><if :when="application.suspended"><span class="w-chip w-chip-secondary">suspended</span></if></td>
+                  </tr>
+                </loop>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </loop>
+    </if>
+  </main>
+</div>

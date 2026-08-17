@@ -1,0 +1,137 @@
+/* HEIMDALL's own layer over DuVay.
+ *
+ * Layout, spacing, and typography live as Tailwind utilities in the markup
+ * (tailwind.css is generated from tailwind.src.css by `npm run css`). What
+ * remains here is only what utilities cannot carry: the base document, token
+ * aliases used across many templates, child-selector interactions, the
+ * scroll edge-fade trick, keyframes, and the global accessibility rules.
+ *
+ * The token names are DuVay's: --w-surface, --w-text, --w-border. The
+ * fallbacks after each are a light-theme approximation, and they are the
+ * reason a mistyped token name is invisible until someone switches to dark —
+ * which is exactly how the first version of this file shipped half-themed. */
+
+/* Layer order is the contract: DuVay first, utilities last, so a Tailwind
+ * utility in the markup reliably overrides a DuVay base rule (an unlayered
+ * DuVay would beat every layered utility on any conflict — that is how the
+ * tree SVG first got squeezed by DuVay's max-width). This file itself stays
+ * unlayered and outranks both. */
+@layer duvay, properties, theme, utilities;
+@import url("/shared/assets/duvay/duvay.min.css") layer(duvay);
+@import url("/shared/styles/tailwind.css");
+
+body {
+  margin: 0;
+  background: var(--w-surface, #fff);
+  color: var(--w-text, #111);
+  font-family: var(--w-font-family, system-ui, sans-serif);
+}
+
+/* Brand: the primary is Heimdallr's amber, the same family as the mark.
+ * One override reaches everything that reads the token — buttons, links,
+ * the view toggle, focus rings, and the chart line itself. Light theme gets
+ * the darker roast so text and fills keep their contrast on white; dark
+ * theme gets the glow. */
+:root, [w-theme="light"] { --w-primary: #b45309; }
+[w-theme="dark"] { --w-primary: #f5a623; }
+@media (prefers-color-scheme: dark) {
+  [w-theme="auto"] { --w-primary: #f5a623; }
+}
+
+/* Chips and buttons: slightly rounded, consistently — not DuVay's pills. */
+.w-btn, .w-chip { border-radius: 0.45rem; }
+
+/* Token aliases: colour and monospace typography used in too many templates
+ * to repeat as arbitrary-value utilities without drowning the markup. */
+.hd-muted { color: var(--w-text-muted, #666); }
+.hd-link { color: var(--w-primary, #3b5bdb); }
+.hd-field-name { font-family: var(--w-font-family-mono, ui-monospace, monospace); font-size: 0.85rem; }
+.hd-was { color: var(--w-error, #b3261e); text-decoration: line-through; }
+.hd-now { color: var(--w-success, #1b7f3b); }
+.hd-failures { color: var(--w-error, #b3261e); }
+.hd-secret {
+  font-size: 0.7rem; padding: 0 0.3rem; border-radius: 0.25rem;
+  background: var(--w-secondary-container, #eee);
+  color: var(--w-on-secondary-container, #333);
+}
+.hd-code {
+  display: inline-block; padding: 0.5rem 0.8rem; border-radius: 0.4rem;
+  background: var(--w-surface-container-low, #f3f3f3);
+  font-family: var(--w-font-family-mono, ui-monospace, monospace); font-size: 0.85rem;
+}
+.hd-logs {
+  background: var(--w-surface-container-low, #16191b);
+  color: var(--w-text, #ddd);
+  font-family: var(--w-font-family-mono, ui-monospace, monospace);
+}
+
+/* The skip link is the first tab stop, invisible until focused. */
+.skip {
+  position: absolute; left: 0.75rem; top: 0.75rem; z-index: 50;
+  transform: translateY(-300%);
+  background: var(--w-primary, #b45309); color: #fff;
+  padding: 0.5rem 0.9rem; border-radius: 0.45rem; text-decoration: none;
+}
+.skip:focus-visible { transform: none; }
+
+/* A row that takes keyboard focus must show it; DuVay's table reset
+ * removes the default outline. */
+.hd-instance-row:focus-visible {
+  outline: 2px solid var(--w-primary, #b45309); outline-offset: -2px;
+}
+
+/* hd-fade is the entrance for freshly rendered content, used through
+ * Tailwind's arbitrary animate utility. Small and fast: a control plane
+ * page should feel settled, not theatrical. */
+@keyframes hd-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* A table that is wider than the screen scrolls inside its own box rather
+ * than pushing the page sideways. The right-edge fade says "there is more"
+ * on screens where the scrollbar is invisible until touched;
+ * background-attachment keeps the fade pinned to the box while the content
+ * scrolls beneath it. Irreducibly a rule: four stacked backgrounds. */
+.hd-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  background:
+    linear-gradient(to right, var(--w-surface, #fff) 30%, transparent),
+    linear-gradient(to left, var(--w-surface, #fff) 30%, transparent) 100% 0,
+    radial-gradient(farthest-side at 0 50%, rgba(0, 0, 0, 0.18), transparent),
+    radial-gradient(farthest-side at 100% 50%, rgba(0, 0, 0, 0.18), transparent) 100% 0;
+  background-repeat: no-repeat;
+  background-size: 3rem 100%, 3rem 100%, 0.9rem 100%, 0.9rem 100%;
+  background-attachment: local, local, scroll, scroll;
+}
+.hd-scroll table { min-width: 34rem; }
+.hd-diff, .hd-scroll .hd-diff { min-width: 0; }
+
+/* A control-plane error is often a long URL or a provider message with no
+ * spaces in it. Left to itself it overflows the card and the tail — usually
+ * the actionable part — is the bit that disappears. */
+.w-alert, .hd-result, .hd-failures li, .hd-was, .hd-now {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.w-alert { padding: 0.75rem 1rem; border-radius: 0.4rem; }
+
+/* Child-selector interactions utilities cannot reach from the row. */
+.hd-instance-row { cursor: pointer; }
+.hd-instance-row:hover td { background: var(--w-surface-container, rgba(0,0,0,0.03)); }
+.hd-node--link { cursor: pointer; }
+
+/* Focus visibility for DuVay's own button class and the link alias. */
+.w-btn:focus-visible, .hd-link:focus-visible {
+  outline: 2px solid var(--w-primary, #3b5bdb); outline-offset: 2px;
+}
+
+/* Touch targets stay at least 44px on small screens. */
+@media (max-width: 40rem) {
+  .w-btn { min-height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
