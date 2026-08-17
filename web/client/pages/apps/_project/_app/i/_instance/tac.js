@@ -180,12 +180,13 @@ export default class InstancePage {
   // answers those, and an empty CPU chart during startup is honest.
   availableGroups() {
     const series = this.series || {}
+    const has = (field) => (series[field] || []).length > 0
     const groups = new Set(['cpu', 'memory'])
-    if (series.net_rx_bytes || series.net_tx_bytes) groups.add('network')
-    if (series.block_read_bytes || series.block_write_bytes) groups.add('block')
-    if (series.pids) groups.add('pids')
-    if (series.cpu_throttled) groups.add('throttling')
-    if (series.net_errors) groups.add('net_errors')
+    if (has('net_rx_bytes') || has('net_tx_bytes')) groups.add('network')
+    if (has('block_read_bytes') || has('block_write_bytes')) groups.add('block')
+    if (has('pids')) groups.add('pids')
+    if (has('cpu_throttled')) groups.add('throttling')
+    if (has('net_errors')) groups.add('net_errors')
     return groups
   }
 
