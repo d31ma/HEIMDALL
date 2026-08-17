@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
 	"path"
+	"slices"
 	"time"
 
 	"github.com/d31ma/heimdall/internal/git"
@@ -352,11 +354,14 @@ func (e *Engine) apply(binding store.RootBinding, manifest Manifest) (Result, er
 			change(provider.OpCreate, "application:"+key)
 		case existing.RepoID != repo.ID || existing.TargetID != target.ID ||
 			existing.Path != decl.Path || existing.Ref != decl.Ref ||
+			!slices.Equal(existing.Overlays, decl.Overlays) ||
+			!maps.Equal(existing.Variables, decl.Variables) ||
 			existing.Suspended != decl.Suspended || existing.SyncPolicy != policy ||
 			existing.ManagedBy != store.ManagedByRegistry:
 			if err := applications.Patch(existing.ID, map[string]any{
 				"repo_id": repo.ID, "target_id": target.ID,
 				"path": decl.Path, "ref": decl.Ref,
+				"overlays": decl.Overlays, "variables": decl.Variables,
 				"sync_policy": policy, "suspended": decl.Suspended,
 				"managed_by": store.ManagedByRegistry,
 			}); err != nil {

@@ -230,3 +230,39 @@ func TestManifestFailsClosed(t *testing.T) {
 		t.Fatal("a failing manifest still created applications")
 	}
 }
+
+// TestOverlayChangesPropagate: an overlay (or variable) edit in the
+// manifest must patch the application document. The first live staging
+// environment found the gap: an overlay removed from the manifest stayed on
+// the document, and every render after the file's deletion failed with
+// HD0240 — a silently dropped declaration, the exact thing the registry
+// promises never to do.
+func TestOverlayChangesPropagate(t *testing.T) {
+	w := newWorld(t)
+	ctx := context.Background()
+
+	withOverlay := strings.Replace(manifestV1, "    path: deploy\n",
+		"    path: deploy\n    overlays:\n      - compose.staging.yaml\n", 1)
+	w.commitManifest(t, withOverlay)
+	if _, err := w.engine.Sync(ctx, "prn_admin"); err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	apps, _ := store.In[store.Application](w.storage, store.Applications).Find(nil)
+	if len(apps) != 1 || len(apps[0].Overlays) != 1 {
+		t.Fatalf("overlay never landed: %+v", apps)
+	}
+
+	// Removing the overlay must patch the document, not leave it behind.
+	w.commitManifest(t, manifestV1)
+	result, err := w.engine.Sync(ctx, "prn_admin")
+	if err != nil {
+		t.Fatalf("sync after removal: %v", err)
+	}
+	if len(result.Changes) != 1 {
+		t.Fatalf("overlay removal made %d changes: %+v", len(result.Changes), result.Changes)
+	}
+	apps, _ = store.In[store.Application](w.storage, store.Applications).Find(nil)
+	if len(apps[0].Overlays) != 0 {
+		t.Fatalf("the removed overlay survived on the document: %+v", apps[0].Overlays)
+	}
+}
