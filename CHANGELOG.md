@@ -5,6 +5,25 @@ All notable changes to HEIMDALL are recorded here. Versions are CalVer,
 
 ## [Unreleased]
 
+### Added
+
+- The ECS adapter registers a service into a load-balancer target group when
+  the target's config carries `target_group_arn` — the seam between
+  HEIMDALL and the infrastructure that owns the ALB, TLS, and DNS. With two
+  ported services the adapter refuses to guess (HD0363) until
+  `load_balanced_service` names the fronted one. Attachment happens at
+  service creation; a service that predates the target group needs
+  recreating to pick it up.
+
+### Fixed
+
+- `website/Dockerfile` had never met a real Docker daemon, which hid three
+  defects the first build surfaced: the ty installer reads `TAC_INSTALL_DIR`
+  (not `INSTALL_DIR`) so the binary never landed in `/opt/ty`; it downloads
+  from `releases/latest` unless `TAC_BASE_URL` pins it, so the version pin
+  was an illusion; and `ty-linux-x64` needs glibc ≥ 2.39, so the base image
+  moved from bookworm to trixie.
+
 ## [26.34.01-1] — 2026-08-17
 
 Re-cut of 26.34.01: that tag built and checksummed all five platforms but

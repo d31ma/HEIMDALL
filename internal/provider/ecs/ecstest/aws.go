@@ -29,6 +29,9 @@ type Service struct {
 	Status         string
 	Tags           map[string]string
 	TaskArns       []string
+	// LoadBalancers records what CreateService attached: target group ARN,
+	// container name, container port — the seam the infrastructure hands in.
+	LoadBalancers []map[string]any
 }
 
 // TaskDefinition is one registered revision.
@@ -176,6 +179,13 @@ func (f *AWS) ecsCall(w http.ResponseWriter, operation string, body []byte) {
 			Arn:  fmt.Sprintf("arn:aws:ecs:us-east-1:000000000000:service/%s/%s", str("cluster"), name),
 			Name: name, Cluster: str("cluster"), TaskDefinition: str("taskDefinition"),
 			Desired: desired, Running: desired, Status: "ACTIVE", Tags: tags,
+		}
+		if raw, ok := request["loadBalancers"].([]any); ok {
+			for _, entry := range raw {
+				if balancer, ok := entry.(map[string]any); ok {
+					service.LoadBalancers = append(service.LoadBalancers, balancer)
+				}
+			}
 		}
 		// The fake scheduler runs everything immediately.
 		for i := 0; i < desired; i++ {

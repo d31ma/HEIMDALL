@@ -9,24 +9,27 @@
 #   docker build -t heimdall-website:$(cat VERSION) -f website/Dockerfile website
 #
 # ── Stage 1: fetch the pinned ty binary ────────────────────────────────────
-FROM debian:bookworm-slim AS fetch
+FROM debian:trixie-slim AS fetch
 
 ARG TACHYON_VERSION=latest
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl \
  && rm -rf /var/lib/apt/lists/*
+# The installer reads TAC_INSTALL_DIR (not INSTALL_DIR) and always fetches
+# from releases/latest unless TAC_BASE_URL pins it — set both, or the pin is
+# an illusion and the binary lands outside /opt/ty.
 RUN set -eu; \
     if [ "$TACHYON_VERSION" = "latest" ]; then \
-      url="https://github.com/d31ma/TACHYON/releases/latest/download/install.sh"; \
+      base="https://github.com/d31ma/TACHYON/releases/latest/download"; \
     else \
-      url="https://github.com/d31ma/TACHYON/releases/download/${TACHYON_VERSION}/install.sh"; \
+      base="https://github.com/d31ma/TACHYON/releases/download/${TACHYON_VERSION}"; \
     fi; \
     mkdir -p /opt/ty; \
-    curl -fsSL "$url" | INSTALL_DIR=/opt/ty sh; \
+    curl -fsSL "$base/install.sh" | TAC_INSTALL_DIR=/opt/ty TAC_BASE_URL="$base" sh; \
     /opt/ty/ty --version
 
 # ── Stage 2: the site ──────────────────────────────────────────────────────
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 # curl stays for the container health probe; nothing else is installed.
 RUN apt-get update \
