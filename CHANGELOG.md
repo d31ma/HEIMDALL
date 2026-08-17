@@ -22,7 +22,10 @@ All notable changes to HEIMDALL are recorded here. Versions are CalVer,
   (not `INSTALL_DIR`) so the binary never landed in `/opt/ty`; it downloads
   from `releases/latest` unless `TAC_BASE_URL` pins it, so the version pin
   was an illusion; and `ty-linux-x64` needs glibc ≥ 2.39, so the base image
-  moved from bookworm to trixie.
+  moved from bookworm to trixie. The first live deploy added a fourth: ty
+  binds loopback unless told otherwise, so the container passed its own
+  healthcheck while failing every ALB probe — the CMD now binds 0.0.0.0
+  with `--allow-non-loopback`.
 
 ## [26.34.01-1] — 2026-08-17
 

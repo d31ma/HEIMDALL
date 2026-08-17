@@ -50,4 +50,6 @@ WORKDIR /srv/website
 EXPOSE 8080
 
 # --no-watch: nothing rebuilds in production; the container is immutable.
-CMD ["ty", "serve", "--port", "8080", "--no-watch"]
+# ty binds loopback unless told otherwise — a container that only answers
+# itself passes its own healthcheck and fails every load-balancer probe.
+CMD ["ty", "serve", "--host", "0.0.0.0", "--allow-non-loopback", "--port", "8080", "--no-watch"]
