@@ -434,6 +434,11 @@ func (p *Provider) execute(
 			return err
 		}
 
+		balancers, err := loadBalancersFor(target, service, services)
+		if err != nil {
+			return err
+		}
+
 		input := &awsecs.CreateServiceInput{
 			Cluster:        aws.String(cluster),
 			ServiceName:    aws.String(resourceName(plan.App, service.Name)),
@@ -441,6 +446,7 @@ func (p *Provider) execute(
 			DesiredCount:   aws.Int32(replicas),
 			LaunchType:     ecstypes.LaunchTypeFargate,
 			Tags:           tags,
+			LoadBalancers:  balancers,
 		}
 		if subnets := strings.Split(target.Config["subnets"], ","); subnets[0] != "" {
 			assignPublic := ecstypes.AssignPublicIpDisabled
@@ -459,6 +465,52 @@ func (p *Provider) execute(
 		return err
 	}
 	return nil
+}
+
+// loadBalancersFor registers a service into the target's load-balancer
+// target group. Infrastructure owns the load balancer and the target group —
+// Terraform or its peer creates them and hands the ARN to the target as
+// `target_group_arn` config; the adapter's job ends at attaching the one
+// service that fronts it, on creation.
+//
+// ponytail: attach on CreateService only — a service that existed before the
+// target group did needs recreating to pick it up; wire UpdateService's
+// LoadBalancers field when that recreation becomes a real operational cost.
+func loadBalancersFor(target provider.Target, service spec.Service, all map[string]spec.Service) ([]ecstypes.LoadBalancer, error) {
+	arn := target.Config["target_group_arn"]
+	if arn == "" {
+		return nil, nil
+	}
+	named := target.Config["load_balanced_service"]
+	switch {
+	case named == "":
+		// Unambiguous only when exactly one service publishes a port.
+		ported := 0
+		for _, candidate := range all {
+			if len(candidate.Ports) > 0 {
+				ported++
+			}
+		}
+		if ported > 1 {
+			return nil, fmt.Errorf(
+				"HD0363: target %s carries target_group_arn and %d services publish ports; name the fronted one in load_balanced_service",
+				target.ID, ported)
+		}
+	case named != service.Name:
+		return nil, nil
+	case len(service.Ports) == 0:
+		return nil, fmt.Errorf(
+			"HD0363: target %s names %s as load_balanced_service but it publishes no port",
+			target.ID, service.Name)
+	}
+	if len(service.Ports) == 0 {
+		return nil, nil
+	}
+	return []ecstypes.LoadBalancer{{
+		TargetGroupArn: aws.String(arn),
+		ContainerName:  aws.String(service.Name),
+		ContainerPort:  aws.Int32(int32(service.Ports[0].Target)),
+	}}, nil
 }
 
 func nonEmpty(values []string) []string {

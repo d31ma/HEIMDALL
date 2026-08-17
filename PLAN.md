@@ -495,6 +495,14 @@ but it sells a first deploy rather than improving the tenth, so it is not on the
 path. Multi-source applications. A notification engine beyond outbound webhooks. An
 interactive container shell, which is rejected on principle rather than deferred.
 
+**Phases 8–10: Terraform/OpenTofu infrastructure provisioning** — see
+[`PLAN-IAC.md`](PLAN-IAC.md). ≈13 weeks post-GA. Terraform does *not* fit the
+`DeploySpec`/`Provider` model (its own plan/apply/state lifecycle inverts ours), so it lands
+as a second reconciler shape in `internal/infra/` rather than a fifth adapter. The
+differentiator is the seam nobody else covers: infra outputs flowing into compose overlays
+as typed refs, so one control plane provisions the cluster *and* deploys the workload onto
+it. That plan's Phase 9 is the phase that justifies the feature.
+
 ---
 
 ## Verification

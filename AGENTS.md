@@ -40,12 +40,13 @@ host-deferred.
 
 [`PLAN.md`](PLAN.md) is the source of truth for architecture, roadmap, and verification
 until `docs/PROJECT_PLAN.md` and the ADRs land. Read it before proposing any structural
-change.
+change. [`PLAN-IAC.md`](PLAN-IAC.md) covers the post-GA Terraform/OpenTofu feature
+(Phases 8–10) and is not in scope until Phase 7 ships.
 
 `api/openapi.json` is generated from the route table by `heimdall contract` — never
 hand-edit it. `scripts/` holds dependency install, the CI gates, and client vendoring.
 `.github/workflows/ci.yml` runs fmt, vet, golangci-lint, test, `govulncheck`, and a
-licence scan; it has never executed on a runner. ADRs 0001-0005 are in `docs/adr/`.
+licence scan; it has never executed on a runner. ADRs 0001-0010 are in `docs/adr/`.
 `docs/architecture/` and `docs/operations/` do not exist yet, deliberately — per the
 shared instructions, create them in the slice that needs them rather than as placeholders.
 
@@ -126,6 +127,15 @@ change, not a follow-up task.
   containers is Portainer's product, not this one. HEIMDALL shows what git declared and
   what the runtime actually has. **No interactive container shell** — it is an
   anti-GitOps escape hatch and a serious security surface. Streaming logs only.
+- **IaC (post-GA): ship OpenTofu only, never a `terraform` binary.** Terraform ≥1.6 is
+  BUSL-licensed and cannot be bundled into a commercial control plane. A customer may
+  supply their own copy for us to execute; we do not distribute it.
+- **Never store Terraform state.** It holds plaintext secrets and would contradict the
+  zero-secrets gate. Pass through the customer's own backend. Managed state, if ever,
+  needs its own ADR and a narrow explicit gate exemption.
+- **`tofu apply` always requires approval by default**, `infra:approve` is grantable
+  separately from `infra:apply` (four-eyes), and auto-apply is blocked on any
+  delete/replace. Parse `tofu show -json`, never human-readable output.
 - The **adapter conformance suite** (`internal/provider/conformance`) runs against every
   adapter. Extend it before adding an adapter, never after.
 

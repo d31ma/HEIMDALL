@@ -181,3 +181,77 @@ func TestFargateSizeSnapsToTiers(t *testing.T) {
 		t.Fatal("nothing was registered")
 	}
 }
+
+// TestTargetGroupAttachment: infrastructure owns the load balancer and hands
+// the target its target group ARN as config; the adapter registers the one
+// ported service into it at creation, with the container port the compose
+// file published.
+func TestTargetGroupAttachment(t *testing.T) {
+	h, fake := harness(t)
+	arn := "arn:aws:elasticloadbalancing:us-east-1:000000000000:targetgroup/web/abc123"
+	h.Target.Config["target_group_arn"] = arn
+	want := ecsSpec("rev-tg")
+	ctx := context.Background()
+
+	plan, err := h.Provider.Plan(ctx, h.Target, want)
+	if err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	if _, err := h.Provider.Apply(h.ApplyContext(ctx, want), h.Target, plan); err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+
+	fake.Mu.Lock()
+	defer fake.Mu.Unlock()
+	attached := 0
+	for _, service := range fake.Services {
+		for _, balancer := range service.LoadBalancers {
+			attached++
+			if balancer["targetGroupArn"] != arn {
+				t.Fatalf("wrong target group: %v", balancer["targetGroupArn"])
+			}
+			if balancer["containerName"] != "web" {
+				t.Fatalf("wrong container: %v", balancer["containerName"])
+			}
+			if port, _ := balancer["containerPort"].(float64); int(port) != 80 {
+				t.Fatalf("wrong container port: %v", balancer["containerPort"])
+			}
+		}
+	}
+	if attached != 1 {
+		t.Fatalf("expected exactly one load-balanced service, found %d", attached)
+	}
+}
+
+// TestTargetGroupAmbiguityRefused: two ported services and no
+// load_balanced_service is a guess the adapter must not make.
+func TestTargetGroupAmbiguityRefused(t *testing.T) {
+	h, _ := harness(t)
+	h.Target.Config["target_group_arn"] = "arn:aws:elasticloadbalancing:us-east-1:000000000000:targetgroup/web/abc123"
+	want := spec.DeploySpec{
+		App: "checkout", Revision: "rev-ambiguous",
+		Services: []spec.Service{
+			{Name: "web", Image: "nginx:1", Ports: []spec.Port{{Published: 80, Target: 80, Protocol: "tcp"}}},
+			{Name: "api", Image: "nginx:1", Ports: []spec.Port{{Published: 81, Target: 81, Protocol: "tcp"}}},
+		},
+	}
+	want.Normalize()
+	ctx := context.Background()
+
+	plan, err := h.Provider.Plan(ctx, h.Target, want)
+	if err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	result, err := h.Provider.Apply(h.ApplyContext(ctx, want), h.Target, plan)
+	if err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	if len(result.Failures) == 0 {
+		t.Fatal("two ported services with one target group must refuse, not guess")
+	}
+	for _, reason := range result.Failures {
+		if !strings.Contains(reason, "HD0363") {
+			t.Fatalf("expected HD0363 in the refusal, got: %q", reason)
+		}
+	}
+}
