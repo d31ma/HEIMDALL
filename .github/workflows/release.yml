@@ -46,6 +46,9 @@ jobs:
         env:
           SESAME_VERSION: v26.33.02
           FYLO_VERSION: v26.33.02
+          CHEX_VERSION: v26.32.02
+          TACHYON_VERSION: v26.33.02
+          TTID_VERSION: v26.32.03
 
       - name: Run the tests and gates first
         # A release is not a place to discover the build is broken.

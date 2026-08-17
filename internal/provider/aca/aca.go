@@ -132,7 +132,7 @@ func (p *Provider) client(ctx context.Context, target provider.Target) (*armappc
 
 	options := &arm.ClientOptions{}
 	if p.Transport != nil {
-		options.ClientOptions.Transport = p.Transport
+		options.Transport = p.Transport
 	}
 	client, err := armappcontainers.NewContainerAppsClient(subscription, credential, options)
 	if err != nil {

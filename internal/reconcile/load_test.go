@@ -1,11 +1,15 @@
+//go:build load
+
 package reconcile_test
 
 // The load smoke: 500 applications across 4 targets, synced through the real
 // engine against fake Docker Engines, reporting sync latency percentiles.
-// Gated behind HD_LOAD=1 because it takes minutes, not milliseconds — CI runs
-// correctness, an operator runs this before trusting a big fleet.
+// Behind a build tag (with the HD_LOAD knob kept as a second gate) because it
+// takes minutes, not milliseconds — CI runs correctness, an operator runs
+// this before trusting a big fleet. The tag also keeps its skip out of CI's
+// refuse-skipped-suites gate, which exists to catch missing binaries.
 //
-// Run with: HD_LOAD=1 go test ./internal/reconcile/ -run LoadSmoke -v -timeout 30m
+// Run with: HD_LOAD=1 go test -tags load ./internal/reconcile/ -run LoadSmoke -v -timeout 30m
 
 import (
 	"context"

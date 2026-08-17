@@ -12,6 +12,7 @@ package cloudrun
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -508,18 +509,6 @@ func isNotFound(err error) bool {
 	return false
 }
 
-// errorsAs avoids importing errors twice under gofmt grouping churn.
 func errorsAs(err error, target **googleapi.Error) bool {
-	for err != nil {
-		if typed, ok := err.(*googleapi.Error); ok {
-			*target = typed
-			return true
-		}
-		unwrapper, ok := err.(interface{ Unwrap() error })
-		if !ok {
-			return false
-		}
-		err = unwrapper.Unwrap()
-	}
-	return false
+	return errors.As(err, target)
 }

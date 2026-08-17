@@ -5,6 +5,8 @@ All notable changes to HEIMDALL are recorded here. Versions are CalVer,
 
 ## [Unreleased]
 
+## [26.34.01] — 2026-08-17
+
 ### Fixed — regressions the release audit caught in the Tac migration
 
 The web e2e suite (`scripts/e2e-web.sh`) caught three regressions the page-class
