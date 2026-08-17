@@ -5,7 +5,13 @@ All notable changes to HEIMDALL are recorded here. Versions are CalVer,
 
 ## [Unreleased]
 
-## [26.34.01] — 2026-08-17
+## [26.34.01-1] — 2026-08-17
+
+Re-cut of 26.34.01: that tag built and checksummed all five platforms but
+could not publish — GitHub artifact attestation is unavailable to private
+repositories, and the workflow treated it as load-bearing. Attestation is
+now conditional on the repository being public, with release notes that say
+which path was taken. No product change beyond the workflow fix.
 
 ### Fixed — regressions the release audit caught in the Tac migration
 
