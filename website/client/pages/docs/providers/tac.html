@@ -30,12 +30,16 @@
 <table>
 <thead><tr><th scope="col">Provider</th><th scope="col">Keys</th></tr></thead>
 <tbody>
-<tr><td>ECS</td><td><code>subnets</code>, <code>security_groups</code>, <code>assign_public_ip</code>, <code>execution_role_arn</code>, <code>log_group</code>, <code>scheduler_role_arn</code> (scheduled services), <code>target_group_arn</code> and <code>load_balanced_service</code> (below)</td></tr>
+<tr><td>ECS</td><td><code>subnets</code>, <code>security_groups</code>, <code>assign_public_ip</code>, <code>execution_role_arn</code>, <code>log_group</code>, <code>scheduler_role_arn</code> (scheduled services), <code>capacity_provider</code> (below), <code>target_group_arn</code> and <code>load_balanced_service</code> (below)</td></tr>
 <tr><td>Cloud Run</td><td><code>scheduler_service_account</code> — the identity Cloud Scheduler runs a scheduled job as</td></tr>
 <tr><td>Container Apps</td><td><code>subscription_id</code>, <code>resource_group</code></td></tr>
 <tr><td>Docker / Swarm</td><td>none; the target's <code>endpoint</code> is the Engine, or the target is reached through an agent</td></tr>
 </tbody>
 </table>
+
+<h2>Interruptible capacity</h2>
+<p>A target naming <code>capacity_provider: FARGATE_SPOT</code> schedules onto spare capacity at roughly a third of the price. Spot tasks are reclaimed with two minutes' warning and ECS reschedules them, which is the right trade for staging, preview and batch targets — and the wrong one for a target carrying traffic that cannot be dropped. It is opt-in per target: say nothing and the service keeps on-demand Fargate.</p>
+<p>The capacity provider has to be enabled on the cluster before a service can name it, which is infrastructure's job, not HEIMDALL's.</p>
 
 <h2>Putting a load balancer in front of ECS</h2>
 <p>Terraform (or whatever owns your infrastructure) creates the load balancer, its listener, and a target group; the target's <code>target_group_arn</code> hands that group to the adapter, and the service that publishes a port is registered into it when the service is created.</p>

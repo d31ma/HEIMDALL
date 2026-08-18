@@ -457,9 +457,20 @@ func (p *Provider) execute(
 			ServiceName:    aws.String(resourceName(plan.App, service.Name)),
 			TaskDefinition: aws.String(taskDefinition),
 			DesiredCount:   aws.Int32(replicas),
-			LaunchType:     ecstypes.LaunchTypeFargate,
 			Tags:           tags,
 			LoadBalancers:  balancers,
+		}
+		// A capacity provider and a launch type are mutually exclusive: ECS
+		// refuses a service that names both. Naming a provider is how a
+		// target asks for Fargate Spot, whose tasks are interrupted with two
+		// minutes' warning — right for a staging or batch target, wrong for
+		// one carrying traffic that cannot be dropped.
+		if provider := strings.TrimSpace(target.Config["capacity_provider"]); provider != "" {
+			input.CapacityProviderStrategy = []ecstypes.CapacityProviderStrategyItem{
+				{CapacityProvider: aws.String(provider), Weight: 1},
+			}
+		} else {
+			input.LaunchType = ecstypes.LaunchTypeFargate
 		}
 		if subnets := strings.Split(target.Config["subnets"], ","); subnets[0] != "" {
 			assignPublic := ecstypes.AssignPublicIpDisabled
