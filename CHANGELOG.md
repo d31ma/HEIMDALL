@@ -7,6 +7,14 @@ All notable changes to HEIMDALL are recorded here. Versions are CalVer,
 
 ### Fixed
 
+- The instance, metrics, log and event routes picked the local adapter by
+  provider name, so an agent-managed target answered "docker engine
+  unreachable at http://docker" from a control plane that has no such
+  socket — while the same application's status, which resolves through the
+  reconciler, read fine. Reads now resolve exactly as writes do.
+
+### Fixed
+
 - Agent-dispatched applications read back correctly: Remote.Plan stamped
   the target's *region* into the workload identity (a fossil from before
   targets had a project field), so the agent labelled containers with

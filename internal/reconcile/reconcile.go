@@ -601,6 +601,19 @@ func (e *Engine) History(appID string, limit int) ([]store.Operation, error) {
 
 // Revisions returns this application's stored revisions, newest first. They
 // are the rollback targets.
+// AdapterFor answers which provider an application's reads must go through,
+// and the target they address. A target behind an agent resolves to the
+// dispatching provider, exactly as every write path already does — the
+// observability routes used to pick the local adapter by provider name and
+// dial a Docker socket the control plane does not have.
+func (e *Engine) AdapterFor(appID string) (provider.Provider, store.Target, error) {
+	resolved, err := e.resolve(appID)
+	if err != nil {
+		return nil, store.Target{}, err
+	}
+	return resolved.adapter, resolved.target, nil
+}
+
 func (e *Engine) Revisions(appID string, limit int) ([]store.Revision, error) {
 	revisions, err := store.In[store.Revision](e.Store, store.Revisions).Find(store.Equals("app_id", appID))
 	if err != nil {

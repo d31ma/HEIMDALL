@@ -1185,3 +1185,43 @@ func TestSecretHintsPutRotationIntoTheHash(t *testing.T) {
 		t.Fatal("an unanswerable sops reference must fail the refresh")
 	}
 }
+
+// TestAdapterForDispatchesAgentTargets: the observability routes ask the
+// engine which adapter an application's reads go through. They used to pick
+// the local adapter by provider name, so an agent-managed target answered
+// "docker engine unreachable at http://docker" from a control plane that
+// has no such socket — while the same application's status, resolved here,
+// read fine. Reads and writes resolve identically.
+func TestAdapterForDispatchesAgentTargets(t *testing.T) {
+	w := newWorld(t)
+
+	// The local target resolves to the local adapter.
+	adapter, target, err := w.engine.AdapterFor(w.appID)
+	if err != nil {
+		t.Fatalf("adapter for a local target: %v", err)
+	}
+	if _, remote := adapter.(*dispatch.Remote); remote {
+		t.Fatal("a target with no agent must not resolve to the dispatcher")
+	}
+	if target.AgentID != "" {
+		t.Fatalf("unexpected agent on the local target: %q", target.AgentID)
+	}
+
+	// Give the target an agent, and the same call must dispatch instead.
+	w.engine.Dispatcher = dispatch.New(time.Second)
+	if err := store.In[store.Target](w.storage, store.Targets).Patch(target.ID, map[string]any{
+		"agent_id": "agt-1",
+	}); err != nil {
+		t.Fatalf("patch target: %v", err)
+	}
+	adapter, target, err = w.engine.AdapterFor(w.appID)
+	if err != nil {
+		t.Fatalf("adapter for an agent target: %v", err)
+	}
+	if _, remote := adapter.(*dispatch.Remote); !remote {
+		t.Fatalf("an agent-managed target resolved to %T; reads would dial a runtime this host cannot see", adapter)
+	}
+	if target.AgentID != "agt-1" {
+		t.Fatalf("target lost its agent: %+v", target)
+	}
+}
