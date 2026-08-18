@@ -34,6 +34,10 @@ type Service struct {
 	// LoadBalancers records what CreateService attached: target group ARN,
 	// container name, container port — the seam the infrastructure hands in.
 	LoadBalancers []map[string]any
+	// LaunchType and CapacityProviders record how the service asked to be
+	// scheduled. They are mutually exclusive, and ECS refuses both.
+	LaunchType        string
+	CapacityProviders []string
 }
 
 // TaskDefinition is one registered revision.
@@ -192,6 +196,15 @@ func (f *AWS) ecsCall(w http.ResponseWriter, operation string, body []byte) {
 			Arn:  fmt.Sprintf("arn:aws:ecs:us-east-1:000000000000:service/%s/%s", str("cluster"), name),
 			Name: name, Cluster: str("cluster"), TaskDefinition: str("taskDefinition"),
 			Desired: desired, Running: desired, Status: "ACTIVE", Tags: tags,
+		}
+		service.LaunchType, _ = request["launchType"].(string)
+		if raw, ok := request["capacityProviderStrategy"].([]any); ok {
+			for _, entry := range raw {
+				if item, ok := entry.(map[string]any); ok {
+					name, _ := item["capacityProvider"].(string)
+					service.CapacityProviders = append(service.CapacityProviders, name)
+				}
+			}
 		}
 		if raw, ok := request["loadBalancers"].([]any); ok {
 			for _, entry := range raw {

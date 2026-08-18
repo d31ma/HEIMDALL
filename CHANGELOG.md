@@ -5,6 +5,14 @@ All notable changes to HEIMDALL are recorded here. Versions are CalVer,
 
 ## [Unreleased]
 
+### Added
+
+- An ECS target can name a `capacity_provider` — `FARGATE_SPOT` buys
+  interruptible capacity at roughly a third of the price, which is the
+  right trade for a staging or batch target and the wrong one for
+  production. It is opt-in per target and mutually exclusive with the
+  launch type, because ECS refuses a service that carries both.
+
 ### Changed
 
 - The website documented a product two releases old and made three claims

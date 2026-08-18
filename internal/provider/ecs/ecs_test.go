@@ -276,3 +276,66 @@ func TestAWSConnectionsAreReusedAcrossPolls(t *testing.T) {
 		t.Fatalf("30 polls opened %d connections; the SDK transport is not shared", fake.Connections())
 	}
 }
+
+// TestCapacityProviderReplacesLaunchType: a target naming a capacity
+// provider asks for it instead of the default launch type — ECS refuses a
+// service that carries both, so this is an either/or the adapter has to get
+// right. Naming FARGATE_SPOT is how a staging target buys interruptible
+// capacity at a discount.
+func TestCapacityProviderReplacesLaunchType(t *testing.T) {
+	h, fake := harness(t)
+	h.Target.Config["capacity_provider"] = "FARGATE_SPOT"
+	want := ecsSpec("rev-spot")
+	ctx := context.Background()
+
+	plan, err := h.Provider.Plan(ctx, h.Target, want)
+	if err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	if _, err := h.Provider.Apply(h.ApplyContext(ctx, want), h.Target, plan); err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+
+	fake.Mu.Lock()
+	defer fake.Mu.Unlock()
+	if len(fake.Services) == 0 {
+		t.Fatal("nothing was created")
+	}
+	for name, service := range fake.Services {
+		if service.LaunchType != "" {
+			t.Fatalf("%s carries launch type %q alongside a capacity provider; ECS refuses both",
+				name, service.LaunchType)
+		}
+		if len(service.CapacityProviders) != 1 || service.CapacityProviders[0] != "FARGATE_SPOT" {
+			t.Fatalf("%s asked for %v, not FARGATE_SPOT", name, service.CapacityProviders)
+		}
+	}
+}
+
+// TestDefaultIsOnDemandFargate: a target that names no provider keeps the
+// launch type it always had — Spot is opt-in, never a silent downgrade of
+// something carrying traffic.
+func TestDefaultIsOnDemandFargate(t *testing.T) {
+	h, fake := harness(t)
+	want := ecsSpec("rev-ondemand")
+	ctx := context.Background()
+
+	plan, err := h.Provider.Plan(ctx, h.Target, want)
+	if err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	if _, err := h.Provider.Apply(h.ApplyContext(ctx, want), h.Target, plan); err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+
+	fake.Mu.Lock()
+	defer fake.Mu.Unlock()
+	for name, service := range fake.Services {
+		if service.LaunchType != "FARGATE" {
+			t.Fatalf("%s launch type is %q, want FARGATE", name, service.LaunchType)
+		}
+		if len(service.CapacityProviders) != 0 {
+			t.Fatalf("%s got an unrequested capacity provider: %v", name, service.CapacityProviders)
+		}
+	}
+}
