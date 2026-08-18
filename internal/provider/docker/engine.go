@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -40,6 +41,35 @@ type engine struct {
 	// base is the scheme+host the transport expects. For a unix socket it is
 	// a placeholder host; the dialer ignores it.
 	base string
+}
+
+// engineCache holds one client per endpoint. A fresh transport per call
+// leaks its keep-alive socket when the transport is dropped — one connection
+// per reconcile or scrape poll, forever — which is how a long-running
+// control plane exhausted its host's ephemeral ports. Both adapters in this
+// package share it: they speak to the same Engine, so they pool the same
+// way. Bounded by the number of distinct target endpoints.
+type engineCache struct {
+	mu      sync.Mutex
+	engines map[string]*engine
+}
+
+// get returns the cached client for an endpoint, dialling one on first use.
+func (c *engineCache) get(endpoint string, timeout time.Duration) (*engine, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if cached, ok := c.engines[endpoint]; ok {
+		return cached, nil
+	}
+	dialed, err := newEngine(endpoint, timeout)
+	if err != nil {
+		return nil, err
+	}
+	if c.engines == nil {
+		c.engines = map[string]*engine{}
+	}
+	c.engines[endpoint] = dialed
+	return dialed, nil
 }
 
 // newEngine connects to a Docker Engine. endpoint is a unix socket path, a
@@ -185,14 +215,10 @@ func (e *engineError) notFound() bool { return e.Status == http.StatusNotFound }
 // which for a reconciler usually means "nothing to do" rather than "failed".
 func isNotFound(err error) bool {
 	var engineErr *engineError
-	if ok := asEngineError(err, &engineErr); !ok {
+	if !errors.As(err, &engineErr) {
 		return false
 	}
 	return engineErr.notFound()
-}
-
-func asEngineError(err error, target **engineError) bool {
-	return errors.As(err, target)
 }
 
 // decode reads a JSON response body into out.

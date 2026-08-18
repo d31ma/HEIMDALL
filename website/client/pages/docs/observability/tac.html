@@ -9,7 +9,8 @@
 <h2>The application view</h2>
 <p>An ArgoCD-style resource tree — application, services in dependency order, running instances — with health on every node, a table twin, a search that filters both, and one Activity table merging HEIMDALL's operations with the runtime's own events, because "what happened around 14:07" is one question.</p>
 <h2>Instance dashboards</h2>
-<p>Every instance gets a Grafana-style page: stat tiles (health, state, restarts, started, revision, image), chart panels — CPU, memory, memory-of-limit, network, block I/O, PIDs, CPU throttling, network errors — with deploy markers drawn where revisions landed, and the tailing log underneath.</p>
+<p>Instances on Docker Engine, Swarm, and ECS get a Grafana-style page: stat tiles (health, state, restarts, started, revision, image), chart panels — CPU, memory, memory-of-limit, network, block I/O, PIDs, CPU throttling, network errors — with deploy markers drawn where revisions landed, and the tailing log underneath.</p>
+<p>Cloud Run and Azure Container Apps are the deliberate exception: they refuse metrics and logs and name their platform's own store instead (Cloud Monitoring, Azure Monitor). An instance on those runtimes still shows its identity, health, and the commit that put it there — HEIMDALL simply does not proxy a telemetry stack that already exists.</p>
 <h2>Choosing what to collect</h2>
 <p>A service declares which metric groups its dashboards carry, in the compose file. Unchosen panels are absent, not empty; a typo is rejected at render with the vocabulary named:</p>
 <pre class="site-code">services:
@@ -25,7 +26,7 @@
   </main>
   <footer class="border-t border-[var(--w-border,#e3e3e3)]">
     <div class="max-w-[76rem] mx-auto px-[clamp(1rem,4vw,2.5rem)] py-6 text-[0.85rem] site-muted">
-      HEIMDALL — GitOps for Docker Compose · v26.33.1
+      HEIMDALL — GitOps for Docker Compose · v26.34.02
     </div>
   </footer>
 </div>

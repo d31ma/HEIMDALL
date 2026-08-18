@@ -20,11 +20,15 @@
 <p>A rollback re-applies a stored revision by content, never by ref. It cannot be affected by anything that happened in git since — including a force-push. In-repo (sops) secret ciphertext is pinned by the same commit, so a rollback decrypts exactly what its revision was rendered from.</p>
 <h2>Offline targets park, then drain</h2>
 <p>A sync for a target whose agent is offline parks as a durable pending intent (bounded per target, 24-hour TTL). On reconnect the host runs <em>one</em> fresh sync that re-reads git — an hour of missed commits converges to the newest revision instead of marching through every intermediate one, and superseded intents close pointing at their replacement.</p>
-    </article>
+    <h2>Fleet fan-out</h2>
+<p>Syncing an application that names a group produces one operation per member, run with bounded concurrency, under an umbrella record that reports the whole rollout. Members are processed in a stable name order, so a fan-out that fails is reproducible rather than a lottery.</p>
+<p>A failure threshold halts the rollout: past it, no further hosts are started. Halting means exactly that — in-flight syncs run to completion, because killing a half-applied host to signal a problem creates a second problem. Each member's own operation document records what happened there, so "which of the fifty failed, and why" is a query rather than an investigation.</p>
+
+</article>
   </main>
   <footer class="border-t border-[var(--w-border,#e3e3e3)]">
     <div class="max-w-[76rem] mx-auto px-[clamp(1rem,4vw,2.5rem)] py-6 text-[0.85rem] site-muted">
-      HEIMDALL — GitOps for Docker Compose · v26.33.1
+      HEIMDALL — GitOps for Docker Compose · v26.34.02
     </div>
   </footer>
 </div>

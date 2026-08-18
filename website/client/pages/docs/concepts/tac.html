@@ -23,11 +23,15 @@
     image: ghcr.io/example/migrate:3
     labels:
       heimdall.wave: "1" </pre>
-    </article>
+    <h2>Target group</h2>
+<p>A named tag selector over targets — <code>tier=edge</code>, <code>region=eu</code> — whose membership is derived on every read, never stored. An application deployed to a group is deployed to every member.</p>
+<p>This is the primary case, not an advanced one: fifty shops running the same compose file is the same declaration fifty times, and writing it fifty times is how they drift. An empty selector deliberately matches nothing — a group that accidentally covers the whole fleet is worse than one that covers none of it.</p>
+
+</article>
   </main>
   <footer class="border-t border-[var(--w-border,#e3e3e3)]">
     <div class="max-w-[76rem] mx-auto px-[clamp(1rem,4vw,2.5rem)] py-6 text-[0.85rem] site-muted">
-      HEIMDALL — GitOps for Docker Compose · v26.33.1
+      HEIMDALL — GitOps for Docker Compose · v26.34.02
     </div>
   </footer>
 </div>

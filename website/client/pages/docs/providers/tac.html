@@ -13,21 +13,55 @@
 <table>
 <thead><tr><th scope="col">Capability</th><th scope="col">Engine</th><th scope="col">Swarm</th><th scope="col">ECS</th><th scope="col">Cloud Run</th><th scope="col">ACA</th></tr></thead>
 <tbody>
-<tr><td>Replicas</td><td>rejected — one container per service; use Swarm or a cloud target</td><td>full</td><td>full</td><td>full</td><td>full</td></tr>
+<tr><td>Replicas</td><td>rejected — one container per service; use Swarm or a cloud target</td><td>full</td><td>full</td><td>partial — replicas set minimum instances; the platform scales above them on demand</td><td>full</td></tr>
 <tr><td>Scale to zero</td><td>rejected</td><td>rejected</td><td>rejected</td><td>full</td><td>full</td></tr>
 <tr><td>Bind mounts</td><td>full</td><td>rejected — a node-local path is a different file on every node</td><td>rejected</td><td>rejected</td><td>rejected</td></tr>
 <tr><td>File secrets</td><td>rejected — no secrets API; use env references</td><td>full, with content-hash rotation</td><td>rejected (future work)</td><td>rejected (future work)</td><td>rejected (future work)</td></tr>
 <tr><td>depends_on</td><td>full</td><td>partial — creation order by wave; task start belongs to the scheduler</td><td>partial</td><td>partial</td><td>partial</td></tr>
 </tbody>
 </table>
-<p>The full generated matrix ships in the repository as <code>api/capabilities.md</code>.</p>
+<p>The full generated matrix ships in the repository as <code>api/capabilities.md</code>. That file is generated from the adapters' own answers; the table above is a hand-picked summary of it.</p>
+
+<h2>Metrics and logs are not universal</h2>
+<p>Three of the five runtimes answer instance metrics and logs: Docker Engine and Swarm from the agent's ring buffer and minute rollups, ECS from CloudWatch. <strong>Cloud Run and Azure Container Apps refuse both by design</strong> (<code>HD0370</code>, <code>HD0383</code>) and name the provider-native store to use instead — Cloud Monitoring and Azure Monitor. HEIMDALL never builds a time-series database, and it will not pretend to be one for a platform that already has a good one.</p>
+
+<h2>What a cloud target needs in <code>config</code></h2>
+<p>A target's <code>config</code> map is how infrastructure hands the adapter the things HEIMDALL deliberately does not own — networking, roles, log destinations, and the load balancer.</p>
+<table>
+<thead><tr><th scope="col">Provider</th><th scope="col">Keys</th></tr></thead>
+<tbody>
+<tr><td>ECS</td><td><code>subnets</code>, <code>security_groups</code>, <code>assign_public_ip</code>, <code>execution_role_arn</code>, <code>log_group</code>, <code>scheduler_role_arn</code> (scheduled services), <code>target_group_arn</code> and <code>load_balanced_service</code> (below)</td></tr>
+<tr><td>Cloud Run</td><td><code>scheduler_service_account</code> — the identity Cloud Scheduler runs a scheduled job as</td></tr>
+<tr><td>Container Apps</td><td><code>subscription_id</code>, <code>resource_group</code></td></tr>
+<tr><td>Docker / Swarm</td><td>none; the target's <code>endpoint</code> is the Engine, or the target is reached through an agent</td></tr>
+</tbody>
+</table>
+
+<h2>Putting a load balancer in front of ECS</h2>
+<p>Terraform (or whatever owns your infrastructure) creates the load balancer, its listener, and a target group; the target's <code>target_group_arn</code> hands that group to the adapter, and the service that publishes a port is registered into it when the service is created.</p>
+<pre class="site-code"><code>targets:
+  - project: shop
+    name: prod-ecs
+    provider: ecs
+    region: eu-west-1
+    endpoint: prod                      # the ECS cluster
+    config:
+      subnets: subnet-aaa,subnet-bbb
+      security_groups: sg-web
+      execution_role_arn: arn:aws:iam::123456789012:
+        role/ecs-execution
+      log_group: /ecs/shop/site
+      target_group_arn: arn:aws:elasticloadbalancing:
+        eu-west-1:123456789012:targetgroup/site/abc123
+</code></pre>
+<p>Two rules keep this honest. When more than one service publishes a port the adapter <strong>refuses to guess</strong> (<code>HD0363</code>) until <code>load_balanced_service</code> names the fronted one. And attachment happens at service creation: a service that already existed before you added the target group needs recreating to pick it up.</p>
 <h2>Never silently drop</h2>
 <p>The compose parser models a deliberate subset and decodes with unknown-field rejection: a directive HEIMDALL does not model fails by name and line at render time. What a modelled directive <em>means</em> per provider is the capability matrix's job at plan time. Between the two, nothing you wrote can quietly not happen.</p>
     </article>
   </main>
   <footer class="border-t border-[var(--w-border,#e3e3e3)]">
     <div class="max-w-[76rem] mx-auto px-[clamp(1rem,4vw,2.5rem)] py-6 text-[0.85rem] site-muted">
-      HEIMDALL — GitOps for Docker Compose · v26.33.1
+      HEIMDALL — GitOps for Docker Compose · v26.34.02
     </div>
   </footer>
 </div>

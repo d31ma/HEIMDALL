@@ -22,11 +22,17 @@
 <li>Repositories can require signed commits before anything is rendered.</li>
 <li>The registry manifest cannot declare principals, grants, secret values, or agent enrollment.</li>
 </ul>
-    </article>
+    <h2>Directory, single sign-on, and audit</h2>
+<p>HEIMDALL hosts SCIM 2.0 (<code>/scim/v2/Users</code>, <code>/scim/v2/Groups</code>) and passes bodies to SESAME verbatim — a host that understood SCIM would be a second implementation of a spec the engine already implements. Your IdP provisions and de-provisions people; a directory group maps to a shipped role bundle scoped to one project subtree, so access arrives and leaves with employment rather than with a ticket.</p>
+<p><code>heimdall login --device</code> is the RFC 8628 device grant: the CLI shows a code, a browser approves it, and no password crosses the terminal. Inbound OIDC and SAML login flows and passkeys are engine-complete but host-deferred — they are wired the day a deployment federates, and building them against no IdP would be exactly the untested security code this project refuses to ship.</p>
+<p>Two ledgers answer "who did what": HEIMDALL's operations log and SESAME's authorization decisions. <code>GET /api/v1/audit/export</code> streams both as one correlated NDJSON feed, keyed by principal and policy version, so a compliance question is answerable without replaying policy by hand. The audit log is authoritative and never rebuilt from projections — a log you can regenerate is a log you can rewrite.</p>
+<p>Completed operations can POST to subscribers, HMAC-signed in the shape a forge already understands, so a deploy can page a channel or open a change record without anything polling the API.</p>
+
+</article>
   </main>
   <footer class="border-t border-[var(--w-border,#e3e3e3)]">
     <div class="max-w-[76rem] mx-auto px-[clamp(1rem,4vw,2.5rem)] py-6 text-[0.85rem] site-muted">
-      HEIMDALL — GitOps for Docker Compose · v26.33.1
+      HEIMDALL — GitOps for Docker Compose · v26.34.02
     </div>
   </footer>
 </div>

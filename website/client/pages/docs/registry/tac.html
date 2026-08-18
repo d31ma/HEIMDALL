@@ -31,6 +31,53 @@ applications:
     sync_policy:
       automated: true
       self_heal: true</pre>
+<h2>The full field set</h2>
+<p>The example above is the smallest manifest that works. These are the fields a real one uses.</p>
+<table>
+<thead><tr><th scope="col">On</th><th scope="col">Field</th><th scope="col">What it does</th></tr></thead>
+<tbody>
+<tr><td rowspan="4">repository</td><td><code>url</code></td><td>Where the repository lives. An ssh URL uses the control plane's own deploy key.</td></tr>
+<tr><td><code>default_ref</code></td><td>The ref applications track unless they name their own.</td></tr>
+<tr><td><code>credential_ref</code></td><td>A secret reference for a private repository. Never a value.</td></tr>
+<tr><td><code>require_signature</code></td><td>Refuse to render a commit that is not signed.</td></tr>
+<tr><td rowspan="4">target</td><td><code>region</code>, <code>endpoint</code></td><td>Where the runtime is. <code>endpoint</code> is the ECS cluster, the GCP project, the ACA environment, or the Docker Engine address.</td></tr>
+<tr><td><code>config</code></td><td>What infrastructure hands the adapter — subnets, roles, log groups, the load-balancer target group. See <a href="/docs/providers">Providers</a> for the keys each one needs.</td></tr>
+<tr><td><code>credential_ref</code></td><td>A secret reference resolving to the cloud credential. Empty means the ambient chain — instance role, workload identity, az CLI.</td></tr>
+<tr><td><code>tags</code></td><td>Free-form labels; target groups select on them.</td></tr>
+<tr><td rowspan="5">application</td><td><code>path</code></td><td>The directory holding <code>compose.yaml</code>.</td></tr>
+<tr><td><code>ref</code></td><td>The branch or tag <em>this</em> application tracks, overriding the repository's <code>default_ref</code>. This is how one repository serves several environments.</td></tr>
+<tr><td><code>overlays</code></td><td>Further compose file names inside <code>path</code>, merged over the base in order — compose's own override semantics.</td></tr>
+<tr><td><code>variables</code></td><td>Values for <code>$&#123;VAR&#125;</code> interpolation at render time. Never secrets: these are stored in the manifest, in git, in plain sight. Secrets are <code>$&#123;secret:...&#125;</code> references resolved at apply time.</td></tr>
+<tr><td><code>suspended</code></td><td>Stop reconciling without deleting anything. The UI marks it.</td></tr>
+</tbody>
+</table>
+
+<h2>One repository, several environments</h2>
+<p>An application is a declaration, not a directory — so the same compose file, tracked from different branches onto different targets, is how production and staging stay honest about each other. Promotion becomes a pull request between branches, and nothing about the two environments can drift apart except the commit each one is at.</p>
+<pre class="site-code">applications:
+  - project: shop
+    name: site                 # tracks production
+    repository: site
+    target: prod-ecs
+    path: apps/site
+    sync_policy:
+      automated: true
+      self_heal: true
+
+  - project: shop
+    name: site-staging         # same file, own branch
+    repository: site
+    target: staging-ecs
+    path: apps/site
+    ref: staging
+    sync_policy:
+      automated: true
+      self_heal: true</pre>
+<p>Each application gets its own doorway from infrastructure — its own target group and hostname — so staging is reachable without being production. HEIMDALL itself is deployed this way: production, staging, and a develop environment on a Docker host reached through an agent, all from one root repository.</p>
+
+<h2>What the manifest cannot declare</h2>
+<p>Principals, roles, and grants (SESAME decides those), secret values (references only), and agent enrollment (an agent is not a principal). <strong>Target groups are also not declarable</strong> today — they are registered through the API. A compromised root repository can misroute a deployment; it cannot widen access, read a secret, or enrol a host.</p>
+
 <h2>How a sync behaves</h2>
 <ul>
 <li><strong>Creates and updates</strong> converge the collections on the manifest, in dependency order, and an unchanged manifest makes zero changes.</li>
@@ -48,7 +95,7 @@ applications:
   </main>
   <footer class="border-t border-[var(--w-border,#e3e3e3)]">
     <div class="max-w-[76rem] mx-auto px-[clamp(1rem,4vw,2.5rem)] py-6 text-[0.85rem] site-muted">
-      HEIMDALL — GitOps for Docker Compose · v26.33.1
+      HEIMDALL — GitOps for Docker Compose · v26.34.02
     </div>
   </footer>
 </div>

@@ -468,7 +468,7 @@ func TestRemoteRejectsUnsupportedFeaturesWithoutAnAgent(t *testing.T) {
 		t.Fatal("planned an unsupported spec")
 	}
 	var rejection *provider.RejectionError
-	if !asRejection(err, &rejection) {
+	if !errors.As(err, &rejection) {
 		t.Fatalf("the failure is not a capability rejection, so the host being down masked it: %v", err)
 	}
 }
@@ -486,10 +486,6 @@ func encodeToken(t *testing.T, fields map[string]any) string {
 		t.Fatalf("encode token: %v", err)
 	}
 	return base64.RawURLEncoding.EncodeToString(raw)
-}
-
-func asRejection(err error, target **provider.RejectionError) bool {
-	return errors.As(err, target)
 }
 
 // TestObservabilityJobsRoundTrip: metrics, logs, and events reach an

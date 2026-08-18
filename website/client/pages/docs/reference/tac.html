@@ -14,12 +14,26 @@ heimdall login     sign the CLI in (--device for a browser-approved flow)
 heimdall app       list | get
 heimdall diff      desired versus live, per service
 heimdall sync      deploy (--dry-run, --services a,b, --revision SHA)
+heimdall run       start one execution of a scheduled service, now
 heimdall enroll    mint an agent enrollment token
 heimdall agent     enroll | run, on the target host
 heimdall secret    set a local sealed secret (value via stdin or HD_SECRET_VALUE)
 heimdall backup    archive the deployment directory (serve stopped)
 heimdall restore   restore it
-heimdall contract  regenerate the OpenAPI description and capability matrix</pre>
+heimdall contract  regenerate the OpenAPI description and capability matrix
+heimdall version   print the version this binary was built as</pre>
+<h2>Agent environment</h2>
+<p>An agent installed unattended — by CI, Ansible, or an image build — reads its configuration from the environment rather than from flags.</p>
+<table>
+<thead><tr><th scope="col">Variable</th><th scope="col">Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>HD_ENROLLMENT_TOKEN</code></td><td>The enrollment token, so it never lands in shell history or <code>ps</code> output.</td></tr>
+<tr><td><code>HD_AGENT_DIR</code></td><td>Where the agent keeps its certificate and CA. Survives upgrades.</td></tr>
+<tr><td><code>HD_DOCKER_ENDPOINT</code></td><td>The local Engine, when it is not the default socket.</td></tr>
+<tr><td><code>HD_CA_FILE</code></td><td>The control plane's CA, for a client that verifies by chain rather than by pinned fingerprint.</td></tr>
+</tbody>
+</table>
+
 <h2>Environment</h2>
 <table>
 <thead><tr><th scope="col">Variable</th><th scope="col">Meaning</th></tr></thead>
@@ -47,7 +61,7 @@ heimdall contract  regenerate the OpenAPI description and capability matrix</pre
   </main>
   <footer class="border-t border-[var(--w-border,#e3e3e3)]">
     <div class="max-w-[76rem] mx-auto px-[clamp(1rem,4vw,2.5rem)] py-6 text-[0.85rem] site-muted">
-      HEIMDALL — GitOps for Docker Compose · v26.33.1
+      HEIMDALL — GitOps for Docker Compose · v26.34.02
     </div>
   </footer>
 </div>
