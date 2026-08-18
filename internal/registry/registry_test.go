@@ -266,3 +266,63 @@ func TestOverlayChangesPropagate(t *testing.T) {
 		t.Fatalf("the removed overlay survived on the document: %+v", apps[0].Overlays)
 	}
 }
+
+// TestTargetConfigChangesPropagate: a target's config and tags are where
+// every cloud detail lives — subnets, roles, the load-balancer group, a
+// capacity provider. The diff used to compare neither, so a config edit in
+// the manifest silently never reached the target document: exactly the
+// dropped declaration the registry promises never to make. Found switching
+// staging to Fargate Spot, which did nothing until this landed.
+func TestTargetConfigChangesPropagate(t *testing.T) {
+	w := newWorld(t)
+	ctx := context.Background()
+
+	if _, err := w.engine.Sync(ctx, "prn_admin"); err != nil {
+		t.Fatalf("initial sync: %v", err)
+	}
+	targetHasKey := func() (store.Target, bool) {
+		targets, _ := store.In[store.Target](w.storage, store.Targets).Find(nil)
+		if len(targets) != 1 {
+			t.Fatalf("expected one target, got %d", len(targets))
+		}
+		_, ok := targets[0].Config["capacity_provider"]
+		return targets[0], ok
+	}
+	if _, ok := targetHasKey(); ok {
+		t.Fatal("the base manifest declares no capacity_provider")
+	}
+
+	// Add a config key: the sync must patch the target.
+	withConfig := strings.Replace(manifestV1,
+		"    endpoint: http://127.0.0.1:2375\n",
+		"    endpoint: http://127.0.0.1:2375\n    config:\n      capacity_provider: FARGATE_SPOT\n", 1)
+	w.commitManifest(t, withConfig)
+	result, err := w.engine.Sync(ctx, "prn_admin")
+	if err != nil {
+		t.Fatalf("sync after config add: %v", err)
+	}
+	if len(result.Changes) != 1 {
+		t.Fatalf("a config change made %d changes: %+v", len(result.Changes), result.Changes)
+	}
+	if target, ok := targetHasKey(); !ok || target.Config["capacity_provider"] != "FARGATE_SPOT" {
+		t.Fatalf("config never reached the target: %+v", target.Config)
+	}
+
+	// Idempotence: an unchanged manifest makes no further change.
+	result, err = w.engine.Sync(ctx, "prn_admin")
+	if err != nil {
+		t.Fatalf("re-sync: %v", err)
+	}
+	if len(result.Changes) != 0 {
+		t.Fatalf("an unchanged config re-planned: %+v", result.Changes)
+	}
+
+	// Removing the key must patch it away, not leave it behind.
+	w.commitManifest(t, manifestV1)
+	if _, err := w.engine.Sync(ctx, "prn_admin"); err != nil {
+		t.Fatalf("sync after config removal: %v", err)
+	}
+	if _, ok := targetHasKey(); ok {
+		t.Fatal("the removed config key survived on the target")
+	}
+}

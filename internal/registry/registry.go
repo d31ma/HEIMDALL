@@ -297,12 +297,14 @@ func (e *Engine) apply(binding store.RootBinding, manifest Manifest) (Result, er
 			change(provider.OpCreate, "target:"+key)
 		case existing.Provider != decl.Provider || existing.Region != decl.Region ||
 			existing.Endpoint != decl.Endpoint || existing.CredentialRef != decl.CredentialRef ||
+			!maps.Equal(existing.Config, decl.Config) || !maps.Equal(existing.Tags, decl.Tags) ||
 			existing.ManagedBy != store.ManagedByRegistry:
 			// An agent-enrolled target keeps its AgentID: enrollment is not
 			// declarable (ADR 0007), so the sync never touches it.
 			if err := targets.Patch(existing.ID, map[string]any{
 				"provider": decl.Provider, "region": decl.Region,
 				"endpoint": decl.Endpoint, "credential_ref": decl.CredentialRef,
+				"config": decl.Config, "tags": decl.Tags,
 				"managed_by": store.ManagedByRegistry,
 			}); err != nil {
 				return result, err

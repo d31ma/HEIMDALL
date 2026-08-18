@@ -5,6 +5,17 @@ All notable changes to HEIMDALL are recorded here. Versions are CalVer,
 
 ## [Unreleased]
 
+### Fixed
+
+- The registry's target diff compared neither `config` nor `tags`, so an
+  edit to a target's cloud settings — subnets, roles, the load-balancer
+  group, a capacity provider — silently never reached the stored target: a
+  dropped declaration, the one thing the registry promises never to make.
+  Found switching staging to Fargate Spot, which changed nothing until this
+  landed. The application diff had the same gap for overlays and variables,
+  fixed in 26.34.02; targets close it now, and a regression test covers add,
+  idempotence, and removal.
+
 ### Added
 
 - An ECS target can name a `capacity_provider` — `FARGATE_SPOT` buys
