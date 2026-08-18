@@ -7,6 +7,17 @@ All notable changes to HEIMDALL are recorded here. Versions are CalVer,
 
 ### Changed
 
+- The website documented a product two releases old and made three claims
+  that were no longer true: Cloud Run replicas as full support (it is
+  partial), a metrics-and-logs page for "every instance" (Cloud Run and ACA
+  refuse both by design and name the platform store instead), and a version
+  footer stuck at 26.33.1. Fixed, and the gaps filled: fleet fan-out to
+  target groups, ECS load-balancer attachment and the `config` keys every
+  cloud target needs, the registry manifest's full field set (`ref`,
+  `overlays`, `variables`, `suspended`), a worked one-repository/several-
+  environments example, the SCIM and audit-export surface, and the agent's
+  own environment variables.
+
 - Three one-line `errors.As` wrappers and a duplicated per-endpoint engine
   cache are gone: callers use `errors.As` directly, and the Docker and
   Swarm adapters share one `engineCache` — they speak to the same Engine,

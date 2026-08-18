@@ -1,8 +1,28 @@
+<div align="center">
+
+<img src="website/client/shared/assets/heimdall-mark.svg" alt="HEIMDALL" width="96" height="96">
+
 # HEIMDALL
 
-GitOps continuous delivery and observability for **Docker Compose** workloads —
-across Docker Engine, Docker Swarm, Amazon ECS, Azure Container Apps, and Google
-Cloud Run.
+**GitOps continuous delivery and observability for Docker Compose workloads.**
+
+Docker Engine &middot; Docker Swarm &middot; Amazon ECS &middot; Azure Container Apps &middot; Google Cloud Run
+
+<a href="https://github.com/d31ma/HEIMDALL/actions/workflows/ci.yml"><img src="https://github.com/d31ma/HEIMDALL/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+<a href="https://github.com/d31ma/HEIMDALL/releases/latest"><img src="https://img.shields.io/github/v/release/d31ma/HEIMDALL?label=release&color=e8590c" alt="Release"></a>
+<a href="LICENSE"><img src="https://img.shields.io/badge/licence-Apache--2.0-blue" alt="Licence: Apache-2.0"></a>
+<img src="https://img.shields.io/badge/go-1.26-00ADD8?logo=go&logoColor=white" alt="Go 1.26">
+<img src="https://img.shields.io/badge/platforms-linux%20%C2%B7%20macOS%20%C2%B7%20windows-lightgrey" alt="Platforms">
+
+<a href="#quickstart"><b>Quickstart</b></a> &middot;
+<a href="docs/QUICKSTART.md"><b>Docs</b></a> &middot;
+<a href="#architecture"><b>Architecture</b></a> &middot;
+<a href="docs/adr/"><b>ADRs</b></a> &middot;
+<a href="CONTRIBUTING.md"><b>Contributing</b></a>
+
+</div>
+
+---
 
 ArgoCD's value is not Kubernetes. It is four mechanics: git is the only source of
 truth; a desired state renders deterministically from a commit; live state is read
@@ -13,12 +33,28 @@ The differentiator is the second half: **click a running instance and see its
 metrics, logs, events, and the exact commit that put it there** — without standing
 up Prometheus, Grafana, and Loki alongside.
 
-> **Status: 26.33.1, GA.** A compose repository deploys to Docker Engine,
-> Swarm, ECS, Cloud Run, and Azure Container Apps — directly or through an
-> outbound-only agent, one host or a fifty-host fleet — with drift detection,
-> self-heal, rollback, metrics with deploy markers, SCIM-provisioned access,
-> and drilled backup/restore. Each phase's evidence file
-> (docs/PHASE_*_EVIDENCE.md) records exactly what is proven and what is not.
+## What you get
+
+| | |
+|---|---|
+| **Git is the truth** | A commit renders to a provider-neutral, content-hashed `DeploySpec`. Rollback re-applies a stored revision, never a git operation — a force-push cannot change what rolling back means. |
+| **Five runtimes, one compose file** | Docker Engine, Swarm, ECS, Cloud Run, Container Apps. A directive a runtime cannot express is **rejected at plan time naming the line**, never silently dropped. |
+| **Drift detection and self-heal** | Live state is read back continuously. A killed container and a new commit arrive as the same observation, and policy decides whether to close the gap. |
+| **Observability built in** | Per-instance CPU, memory, network, block IO, PIDs and throttling, with deploy markers on the charts and a live log tail. Provider-native metrics first — HEIMDALL never builds a time-series database. |
+| **Hosts you cannot reach** | `heimdall agent` connects outbound over mTLS and opens no port. Enrollment pins the control plane's certificate fingerprint, so the first connection cannot be intercepted. |
+| **Declared access, declared registry** | SESAME decides every authorization; SCIM provisions it. Applications, targets and repositories are declared in a root repository and reconciled like workloads. |
+| **Secrets are references** | `${secret:...}` resolves at apply time inside one provider call. No value enters a revision, a plan, a diff, a log, or any stored document. |
+
+## Status
+
+**26.34.02 — GA, and self-hosted.** HEIMDALL deploys its own website to Amazon
+ECS, runs its own control plane, and reconciles its production, staging and
+develop environments from a root repository — three branches, one declaration,
+promoted by pull request. Every fix in the last release was found by that live
+use rather than by a test fake.
+
+Each phase's evidence file (`docs/PHASE_*_EVIDENCE.md`) records exactly what is
+proven and what is not, including the standing caveats.
 
 ## How it works
 
