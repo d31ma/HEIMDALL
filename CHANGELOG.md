@@ -5,6 +5,41 @@ All notable changes to HEIMDALL are recorded here. Versions are CalVer,
 
 ## [Unreleased]
 
+## [26.34.02] — 2026-08-18
+
+The first release cut after the product deployed itself: HEIMDALL now runs
+its own website on ECS, hosts its own control plane, and reconciles all
+three of its environments from a root repository. Every fix below was found
+by that live use — a real Docker Engine, a real load balancer, a real agent —
+and none of them by the fakes, which is the honest argument for having done
+it.
+
+### Upgrading
+
+Containers an agent deployed before this release carry a project label
+derived from the target's region, and the corrected identity does not match
+them: the first sync after upgrading plans them as absent and recreates
+them under the right labels. Expect one brief replacement per
+agent-deployed service, and let self-heal do it rather than removing
+containers by hand.
+
+### Added
+
+- The ECS adapter registers a service into a load-balancer target group when
+  the target's config carries `target_group_arn` — the seam between
+  HEIMDALL and the infrastructure that owns the ALB, TLS, and DNS. With two
+  ported services the adapter refuses to guess (HD0363) until
+  `load_balanced_service` names the fronted one. Attachment happens at
+  service creation; a service that predates the target group needs
+  recreating to pick it up.
+
+### Changed
+
+- The Docker Engine API pin moves from 1.43 to 1.44 (Docker Engine 25,
+  January 2024). Modern engines now enforce a minimum client API version
+  and refused the old pin outright — found by the first live agent
+  enrollment, not by any fake.
+
 ### Fixed
 
 - The instance, metrics, log and event routes picked the local adapter by
@@ -12,8 +47,6 @@ All notable changes to HEIMDALL are recorded here. Versions are CalVer,
   unreachable at http://docker" from a control plane that has no such
   socket — while the same application's status, which resolves through the
   reconciler, read fine. Reads now resolve exactly as writes do.
-
-### Fixed
 
 - Agent-dispatched applications read back correctly: Remote.Plan stamped
   the target's *region* into the workload identity (a fossil from before
@@ -41,24 +74,14 @@ All notable changes to HEIMDALL are recorded here. Versions are CalVer,
   rendering a path that no longer exists (HD0240). Found by the staging
   environment's first overlay removal; regression-tested.
 
-### Changed
-
-- The Docker Engine API pin moves from 1.43 to 1.44 (Docker Engine 25,
-  January 2024). Modern engines now enforce a minimum client API version
-  and refused the old pin outright — found by the first live agent
-  enrollment, not by any fake.
-
-### Added
-
-- The ECS adapter registers a service into a load-balancer target group when
-  the target's config carries `target_group_arn` — the seam between
-  HEIMDALL and the infrastructure that owns the ALB, TLS, and DNS. With two
-  ported services the adapter refuses to guess (HD0363) until
-  `load_balanced_service` names the fronted one. Attachment happens at
-  service creation; a service that predates the target group needs
-  recreating to pick it up.
-
-### Fixed
+- The instance dashboard read nothing on a cloud target: the page called
+  the logs route without the service name, and cloud adapters rebuild the
+  provider-side stream name from it, so ECS asked CloudWatch for a stream
+  with an empty service segment and got a not-found. The panel set also
+  assumed every provider answers all ten Docker metric groups, leaving a
+  CloudWatch-backed target showing eight panels "Collecting…" forever; the
+  panels now derive from the series the provider actually returned, gated
+  on sample count.
 
 - `website/Dockerfile` had never met a real Docker daemon, which hid three
   defects the first build surfaced: the ty installer reads `TAC_INSTALL_DIR`
