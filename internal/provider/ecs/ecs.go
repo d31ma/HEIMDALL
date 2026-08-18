@@ -20,6 +20,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -31,6 +32,7 @@ import (
 	awsecs "github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
+	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/d31ma/heimdall/internal/provider"
 	"github.com/d31ma/heimdall/internal/spec"
 )
@@ -58,6 +60,13 @@ type Provider struct {
 	EndpointOverride string
 	// StaticCredentials bypasses the credential chain. Tests only.
 	StaticCredentials aws.CredentialsProvider
+
+	// httpClient is shared across every call: credentials resolve per call,
+	// but the connection pool must not — the SDK otherwise builds a fresh
+	// client and transport per LoadDefaultConfig, and a dropped transport
+	// never returns its keep-alive sockets.
+	httpOnce   sync.Once
+	httpClient *awshttp.BuildableClient
 }
 
 func (p *Provider) Name() string { return "ecs" }
@@ -109,7 +118,11 @@ func (p *Provider) clients(ctx context.Context, target provider.Target) (*awsecs
 		return nil, nil, nil, fmt.Errorf("HD0350: ECS target %s names no region", target.ID)
 	}
 
-	options := []func(*awsconfig.LoadOptions) error{awsconfig.WithRegion(region)}
+	p.httpOnce.Do(func() { p.httpClient = awshttp.NewBuildableClient() })
+	options := []func(*awsconfig.LoadOptions) error{
+		awsconfig.WithRegion(region),
+		awsconfig.WithHTTPClient(p.httpClient),
+	}
 	switch {
 	case p.StaticCredentials != nil:
 		options = append(options, awsconfig.WithCredentialsProvider(p.StaticCredentials))

@@ -255,3 +255,22 @@ func TestTargetGroupAmbiguityRefused(t *testing.T) {
 		}
 	}
 }
+
+// TestAWSConnectionsAreReusedAcrossPolls: each call used to load a fresh SDK
+// configuration whose new HTTP client carried its own transport — one
+// leaked keep-alive socket per drift poll. The adapter now shares one HTTP
+// client, so any number of polls drains into one connection pool.
+func TestAWSConnectionsAreReusedAcrossPolls(t *testing.T) {
+	h, fake := harness(t)
+	ctx := context.Background()
+	want := ecsSpec("rev-conns")
+
+	for i := 0; i < 30; i++ {
+		if _, err := h.Provider.Plan(ctx, h.Target, want); err != nil {
+			t.Fatalf("plan poll %d: %v", i, err)
+		}
+	}
+	if fake.Connections() > 4 {
+		t.Fatalf("30 polls opened %d connections; the SDK transport is not shared", fake.Connections())
+	}
+}

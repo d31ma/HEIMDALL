@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/url"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/d31ma/heimdall/internal/provider"
@@ -30,6 +31,12 @@ type Swarm struct {
 	// exactly as it does for the standalone Provider.
 	Timeout        time.Duration
 	SecretResolver func(ctx context.Context, ref string) (string, error)
+
+	// engines caches one client per endpoint, for the same reason the
+	// standalone Provider does: a dropped transport never returns its
+	// keep-alive socket.
+	mu      sync.Mutex
+	engines map[string]*engine
 }
 
 func (s *Swarm) Name() string { return "swarm" }
@@ -42,7 +49,20 @@ func (s *Swarm) timeout() time.Duration {
 }
 
 func (s *Swarm) connect(target provider.Target) (*engine, error) {
-	return newEngine(target.Endpoint, s.timeout())
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if cached, ok := s.engines[target.Endpoint]; ok {
+		return cached, nil
+	}
+	dialed, err := newEngine(target.Endpoint, s.timeout())
+	if err != nil {
+		return nil, err
+	}
+	if s.engines == nil {
+		s.engines = map[string]*engine{}
+	}
+	s.engines[target.Endpoint] = dialed
+	return dialed, nil
 }
 
 func (s *Swarm) Capabilities() provider.Capabilities {

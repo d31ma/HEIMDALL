@@ -130,6 +130,10 @@ func (p *Provider) client(ctx context.Context, target provider.Target) (*armappc
 		}
 	}
 
+	// Per-call construction is safe here: with no custom Transport, azcore
+	// routes every client through its package-level shared HTTP client and
+	// one connection pool. The Docker and ECS adapters had no such shared
+	// floor and cache their transports instead.
 	options := &arm.ClientOptions{}
 	if p.Transport != nil {
 		options.Transport = p.Transport

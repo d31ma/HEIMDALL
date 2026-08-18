@@ -19,6 +19,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -41,6 +42,7 @@ type Engine struct {
 	// FailPull makes a pull of any image containing this substring fail,
 	// exercising the in-stream error path the Engine actually uses.
 	FailPull string
+	conns    atomic.Int64
 }
 
 // Container is one container the fake is holding.
@@ -64,9 +66,23 @@ func New() *Engine {
 		Volumes:    map[string]bool{},
 		auths:      map[string]*Auth{},
 	}
-	engine.server = httptest.NewServer(http.HandlerFunc(engine.route))
+	engine.server = httptest.NewUnstartedServer(http.HandlerFunc(engine.route))
+	engine.server.Config.ConnState = engine.countConn
+	engine.server.Start()
 	return engine
 }
+
+// countConn tallies accepted TCP connections. An adapter that reuses its
+// transport holds this near one across any number of calls; the
+// connection-per-poll leak this exists to catch counts one per call.
+func (e *Engine) countConn(_ net.Conn, state http.ConnState) {
+	if state == http.StateNew {
+		e.conns.Add(1)
+	}
+}
+
+// Connections is the number of TCP connections ever accepted.
+func (e *Engine) Connections() int64 { return e.conns.Load() }
 
 // NewAt starts a fake Engine on a fixed address, so a demo target registered
 // against it survives the fake being restarted.
@@ -82,7 +98,7 @@ func NewAt(addr string) (*Engine, error) {
 	}
 	engine.server = &httptest.Server{
 		Listener: listener,
-		Config:   &http.Server{Handler: http.HandlerFunc(engine.route)},
+		Config:   &http.Server{Handler: http.HandlerFunc(engine.route), ConnState: engine.countConn},
 	}
 	engine.server.Start()
 	return engine, nil
