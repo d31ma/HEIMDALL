@@ -592,6 +592,13 @@ func TestSyncAndObserveShareOneIdentity(t *testing.T) {
 		Registries: func(context.Context, string) (*provider.RegistryCredential, error) { return nil, nil },
 	}
 
+	// The dispatcher refuses work for a target no agent has ever polled;
+	// wait for the loop above to introduce itself before planning.
+	deadline := time.Now().Add(5 * time.Second)
+	for !dispatcher.Connected(target.ID) && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+
 	want := spec.DeploySpec{
 		App: "web", Revision: "rev-identity",
 		Services: []spec.Service{{Name: "site", Image: "nginx:1.27", Replicas: 1}},
