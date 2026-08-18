@@ -40,6 +40,18 @@ func (r *Remote) Name() string { return r.Capability.Provider }
 
 func (r *Remote) Capabilities() provider.Capabilities { return r.Capability }
 
+// projectFor is the workload's project half of every identity label. It
+// mirrors the adapters' own fallback: the target's Project, or its Region
+// for targets created before Target grew a Project field. Region-as-project
+// is how a live agent stamped containers with project "ca-central-1" while
+// every observe filtered for the real project and read the app as Missing.
+func projectFor(target provider.Target) string {
+	if target.Project != "" {
+		return target.Project
+	}
+	return target.Region
+}
+
 func (r *Remote) jobID() string {
 	if r.NewJobID != nil {
 		return r.NewJobID()
@@ -56,7 +68,7 @@ func (r *Remote) Plan(ctx context.Context, target provider.Target, want spec.Dep
 	}
 	outcome, err := r.Dispatcher.Submit(ctx, Job{
 		ID: r.jobID(), TargetID: target.ID, Kind: KindPlan,
-		App:  provider.AppRef{Project: target.Region, App: want.App},
+		App:  provider.AppRef{Project: projectFor(target), App: want.App},
 		Spec: want,
 	})
 	if err != nil {

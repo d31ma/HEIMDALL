@@ -7,6 +7,15 @@ All notable changes to HEIMDALL are recorded here. Versions are CalVer,
 
 ### Fixed
 
+- Agent-dispatched applications read back correctly: Remote.Plan stamped
+  the target's *region* into the workload identity (a fossil from before
+  targets had a project field), so the agent labelled containers with
+  project "ca-central-1" while every observe filtered on the real project —
+  the app served traffic and planned clean no-ops, yet its status read
+  Missing with no live revision, forever. One identity now flows both
+  directions, regression-tested through the real Remote → dispatcher →
+  agent → fake-engine loop.
+
 - The Docker and ECS adapters built a fresh HTTP transport per call, and a
   dropped transport never returns its keep-alive sockets — one leaked
   connection per reconcile or scrape poll, forever. A long-running demo
