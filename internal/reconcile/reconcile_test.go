@@ -496,6 +496,23 @@ func render(value any) string {
 	return string(encoded)
 }
 
+// findContainer looks a service's container up without failing when it is
+// absent. A standalone-Docker update is a remove-then-create (an image is
+// immutable, so the old container is deleted before the new one exists), so
+// a poll watching for the new revision must tolerate the window in between
+// rather than treat it as a missing service. Callers asserting on a settled
+// state use containerFor, which fails on absence.
+func findContainer(engine *dockertest.Engine, service string) (dockertest.Container, bool) {
+	engine.Mu.Lock()
+	defer engine.Mu.Unlock()
+	for _, container := range engine.Containers {
+		if container.Labels[docker.LabelService] == service {
+			return *container, true
+		}
+	}
+	return dockertest.Container{}, false
+}
+
 func containerFor(t *testing.T, engine *dockertest.Engine, service string) dockertest.Container {
 	t.Helper()
 	engine.Mu.Lock()
@@ -1120,12 +1137,15 @@ func TestWebhookNudgeIsScopedToTheRepository(t *testing.T) {
 	// evidence is the running container, not the record.
 	deadline := time.Now().Add(10 * time.Second)
 	for {
-		api := containerFor(t, world.docker, "api")
-		if strings.Contains(api.Image, "1.5.0") {
+		// The service is briefly absent mid-replace; that is the rollout, not
+		// a failure. Only a settled container carrying the new image ends the
+		// wait.
+		if api, ok := findContainer(world.docker, "api"); ok && strings.Contains(api.Image, "1.5.0") {
 			break
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("the nudged sync never deployed the new revision: %s", api.Image)
+			api, _ := findContainer(world.docker, "api")
+			t.Fatalf("the nudged sync never deployed the new revision: %q", api.Image)
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
