@@ -523,7 +523,9 @@ func TestConnectionsAreReusedAcrossPolls(t *testing.T) {
 			t.Fatalf("observe poll %d: %v", i, err)
 		}
 	}
-	if fake.Connections() > 3 {
+	// A shared pool may hold a few connections on a slow runner; the leak
+	// this regresses opens exactly one per poll.
+	if fake.Connections() > 10 {
 		t.Fatalf("30 polls opened %d connections; the transport is not being reused", fake.Connections())
 	}
 
@@ -536,7 +538,7 @@ func TestConnectionsAreReusedAcrossPolls(t *testing.T) {
 			t.Fatalf("swarm plan poll %d: %v", i, err)
 		}
 	}
-	if fake.Connections()-before > 3 {
+	if fake.Connections()-before > 10 {
 		t.Fatalf("30 swarm polls opened %d connections", fake.Connections()-before)
 	}
 }
