@@ -505,3 +505,38 @@ func TestHeimdallNeverTouchesForeignContainers(t *testing.T) {
 		t.Fatal("an unmanaged container was removed")
 	}
 }
+
+// TestConnectionsAreReusedAcrossPolls: every reconcile and observe poll used
+// to build a fresh transport whose keep-alive socket was never returned — a
+// long-running control plane leaked one connection per poll until the host
+// ran out of ephemeral ports. The adapter now holds one client per endpoint.
+func TestConnectionsAreReusedAcrossPolls(t *testing.T) {
+	fake := dockertest.New()
+	t.Cleanup(fake.Close)
+	adapter := &docker.Provider{}
+	target := provider.Target{ID: "tgt", Provider: "docker", Project: "p", Endpoint: fake.URL()}
+	app := provider.AppRef{Project: "p", App: "web"}
+
+	ctx := context.Background()
+	for i := 0; i < 30; i++ {
+		if _, err := adapter.Observe(ctx, target, app); err != nil {
+			t.Fatalf("observe poll %d: %v", i, err)
+		}
+	}
+	if fake.Connections() > 3 {
+		t.Fatalf("30 polls opened %d connections; the transport is not being reused", fake.Connections())
+	}
+
+	swarm := &docker.Swarm{}
+	before := fake.Connections()
+	empty := spec.DeploySpec{App: "web", Revision: "r1"}
+	empty.Normalize()
+	for i := 0; i < 30; i++ {
+		if _, err := swarm.Plan(ctx, target, empty); err != nil {
+			t.Fatalf("swarm plan poll %d: %v", i, err)
+		}
+	}
+	if fake.Connections()-before > 3 {
+		t.Fatalf("30 swarm polls opened %d connections", fake.Connections()-before)
+	}
+}

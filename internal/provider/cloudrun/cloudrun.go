@@ -95,6 +95,10 @@ func (p *Provider) Capabilities() provider.Capabilities {
 	}
 }
 
+// client is built per call, which is safe here and a leak elsewhere: the
+// Google client's default chain wraps the shared http.DefaultTransport, so
+// every service handle drains into one connection pool. The Docker and ECS
+// adapters had no such shared floor and cache their transports instead.
 func (p *Provider) client(ctx context.Context) (*run.Service, error) {
 	options := []option.ClientOption{}
 	if p.EndpointOverride != "" {

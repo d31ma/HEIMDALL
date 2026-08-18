@@ -9,10 +9,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/aws/smithy-go/encoding/cbor"
@@ -53,6 +55,7 @@ type AWS struct {
 	nextID          int
 
 	server *httptest.Server
+	conns  atomic.Int64
 }
 
 func New() *AWS {
@@ -61,9 +64,19 @@ func New() *AWS {
 		TaskDefinitions: map[string]*TaskDefinition{},
 		LogLines:        map[string][]string{},
 	}
-	fake.server = httptest.NewServer(http.HandlerFunc(fake.route))
+	fake.server = httptest.NewUnstartedServer(http.HandlerFunc(fake.route))
+	fake.server.Config.ConnState = func(_ net.Conn, state http.ConnState) {
+		if state == http.StateNew {
+			fake.conns.Add(1)
+		}
+	}
+	fake.server.Start()
 	return fake
 }
+
+// Connections is the number of TCP connections ever accepted — the
+// regression signal for the connection-per-call transport leak.
+func (f *AWS) Connections() int64 { return f.conns.Load() }
 
 func (f *AWS) URL() string { return f.server.URL }
 func (f *AWS) Close()      { f.server.Close() }

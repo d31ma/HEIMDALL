@@ -7,6 +7,17 @@ All notable changes to HEIMDALL are recorded here. Versions are CalVer,
 
 ### Fixed
 
+- The Docker and ECS adapters built a fresh HTTP transport per call, and a
+  dropped transport never returns its keep-alive sockets — one leaked
+  connection per reconcile or scrape poll, forever. A long-running demo
+  control plane accumulated ~16k connections against its engine and
+  exhausted the host's ephemeral ports, taking down all outbound
+  networking. Docker and Swarm now cache one engine client per endpoint;
+  ECS shares one SDK HTTP client while still resolving credentials per
+  call. Regression tests count accepted connections across thirty polls.
+  Cloud Run and ACA were audited: their SDKs pool through shared
+  platform transports and do not leak.
+
 - The registry diff never compared an application's overlays or variables,
   and its patch never wrote them — an overlay change in the manifest
   silently never propagated, and a removed overlay file left the document
