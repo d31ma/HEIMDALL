@@ -441,13 +441,15 @@ func (s *Server) instanceProvider(w http.ResponseWriter, r *http.Request) (provi
 	if !ok {
 		return nil, store.Target{}, store.Application{}, false
 	}
-	target, err := store.In[store.Target](s.Store, store.Targets).Get(application.TargetID)
+	// One resolution for reads and writes alike: an agent-managed target
+	// answers through the dispatcher, and picking the local adapter by
+	// provider name here would dial a runtime this host cannot see.
+	adapter, target, err := s.Reconcile.AdapterFor(application.ID)
 	if err != nil {
 		s.fail(w, err)
 		return nil, store.Target{}, store.Application{}, false
 	}
-	adapter, ok := s.Providers[target.Provider]
-	if !ok {
+	if adapter == nil {
 		writeJSON(w, http.StatusNotImplemented, map[string]string{
 			"code": "HD0501", "message": "no adapter for provider " + target.Provider,
 		})
