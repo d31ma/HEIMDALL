@@ -507,12 +507,8 @@ func isNotFound(err error) bool {
 	if err == nil {
 		return false
 	}
-	if ok := errorsAs(err, &apiError); ok {
+	if errors.As(err, &apiError) {
 		return apiError.Code == 404
 	}
 	return false
-}
-
-func errorsAs(err error, target **googleapi.Error) bool {
-	return errors.As(err, target)
 }

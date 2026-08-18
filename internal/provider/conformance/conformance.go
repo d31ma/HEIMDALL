@@ -307,7 +307,7 @@ func testRejection(t *testing.T, harness Harness) {
 	}
 
 	var rejection *provider.RejectionError
-	if !asRejection(err, &rejection) {
+	if !errors.As(err, &rejection) {
 		t.Fatalf("rejection is not a *provider.RejectionError, so callers must parse text: %v", err)
 	}
 	if len(rejection.Rejections) == 0 {
@@ -420,10 +420,6 @@ func changedOperations(plan provider.Plan) []provider.Operation {
 		}
 	}
 	return changed
-}
-
-func asRejection(err error, target **provider.RejectionError) bool {
-	return errors.As(err, target)
 }
 
 // WaitFor polls until condition holds or the deadline passes. Adapters whose

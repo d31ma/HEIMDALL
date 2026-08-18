@@ -5,6 +5,14 @@ All notable changes to HEIMDALL are recorded here. Versions are CalVer,
 
 ## [Unreleased]
 
+### Changed
+
+- Three one-line `errors.As` wrappers and a duplicated per-endpoint engine
+  cache are gone: callers use `errors.As` directly, and the Docker and
+  Swarm adapters share one `engineCache` — they speak to the same Engine,
+  so they pool the same way. Net 24 fewer lines, no behaviour change; the
+  connection-reuse regression tests cover it.
+
 ## [26.34.02] — 2026-08-18
 
 The first release cut after the product deployed itself: HEIMDALL now runs

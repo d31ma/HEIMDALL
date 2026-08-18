@@ -9,7 +9,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/d31ma/heimdall/internal/provider"
@@ -49,13 +48,7 @@ type Provider struct {
 	// variable.
 	SecretResolver func(ctx context.Context, ref string) (string, error)
 
-	// engines caches one client per endpoint. A fresh transport per call
-	// leaks its keep-alive socket when the transport is dropped — one
-	// connection per reconcile or scrape poll, forever — which is how a
-	// long-running control plane exhausted its host's ephemeral ports.
-	// Bounded by the number of distinct target endpoints.
-	mu      sync.Mutex
-	engines map[string]*engine
+	engines engineCache
 }
 
 func (p *Provider) Name() string { return "docker" }
@@ -68,20 +61,7 @@ func (p *Provider) timeout() time.Duration {
 }
 
 func (p *Provider) connect(target provider.Target) (*engine, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if cached, ok := p.engines[target.Endpoint]; ok {
-		return cached, nil
-	}
-	dialed, err := newEngine(target.Endpoint, p.timeout())
-	if err != nil {
-		return nil, err
-	}
-	if p.engines == nil {
-		p.engines = map[string]*engine{}
-	}
-	p.engines[target.Endpoint] = dialed
-	return dialed, nil
+	return p.engines.get(target.Endpoint, p.timeout())
 }
 
 // Capabilities is the honest answer for a standalone Docker Engine. Swarm is
