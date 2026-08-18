@@ -555,3 +555,76 @@ func TestObservabilityJobsRoundTrip(t *testing.T) {
 		t.Fatalf("remote events: %v", err)
 	}
 }
+
+// TestSyncAndObserveShareOneIdentity regresses the region-as-project fossil:
+// Remote.Plan used to stamp the target's *region* into the AppRef, the agent
+// labelled every container with it, and every Observe — filtering on the
+// real project — read the application as Missing with no live revision,
+// even while syncs planned perfect no-ops. One identity, both directions.
+func TestSyncAndObserveShareOneIdentity(t *testing.T) {
+	fake := dockertest.New()
+	t.Cleanup(fake.Close)
+
+	dispatcher := dispatch.New(10 * time.Second)
+	target := provider.Target{
+		ID: "tgt-remote", Provider: "docker", Project: "shop",
+		// The region that used to impersonate the project.
+		Region: "ca-central-1", Endpoint: fake.URL(),
+	}
+
+	// The agent side, inlined: poll, execute against the fake engine, report.
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	go func() {
+		for ctx.Err() == nil {
+			job, ok := dispatcher.Poll(ctx, target.ID, 50*time.Millisecond)
+			if !ok {
+				continue
+			}
+			_ = dispatcher.Complete(target.ID, agent.ExecuteJob(ctx, fake.URL(), job))
+		}
+	}()
+
+	remote := &dispatch.Remote{
+		Dispatcher: dispatcher, Target: target,
+		Capability: (&docker.Provider{}).Capabilities(),
+		Secrets:    func(context.Context, string) (string, error) { return "", nil },
+		Registries: func(context.Context, string) (*provider.RegistryCredential, error) { return nil, nil },
+	}
+
+	// The dispatcher refuses work for a target no agent has ever polled;
+	// wait for the loop above to introduce itself before planning.
+	deadline := time.Now().Add(5 * time.Second)
+	for !dispatcher.Connected(target.ID) && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	want := spec.DeploySpec{
+		App: "web", Revision: "rev-identity",
+		Services: []spec.Service{{Name: "site", Image: "nginx:1.27", Replicas: 1}},
+	}
+	want.Normalize()
+
+	plan, err := remote.Plan(ctx, target, want)
+	if err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	if plan.App.Project != "shop" {
+		t.Fatalf("the plan's project is %q; the target's project is shop", plan.App.Project)
+	}
+	if _, err := remote.Apply(dispatch.WithApply(ctx, dispatch.ApplyOptions{Spec: want}), target, plan); err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+
+	// The observe path must see what the apply path wrote.
+	live, err := remote.Observe(ctx, target, provider.AppRef{Project: "shop", App: "web"})
+	if err != nil {
+		t.Fatalf("observe: %v", err)
+	}
+	if live.Revision != "rev-identity" {
+		t.Fatalf("observe read revision %q; the sync deployed rev-identity", live.Revision)
+	}
+	if len(live.Services) != 1 {
+		t.Fatalf("observe read %d services; the sync deployed one", len(live.Services))
+	}
+}

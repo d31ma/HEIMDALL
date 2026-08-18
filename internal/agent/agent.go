@@ -361,7 +361,12 @@ func (a *Agent) run(ctx context.Context, job dispatch.Job) dispatch.Outcome {
 func ExecuteJob(ctx context.Context, endpoint string, job dispatch.Job) dispatch.Outcome {
 	outcome := dispatch.Outcome{JobID: job.ID}
 	target := provider.Target{
-		ID: job.TargetID, Provider: "docker", Region: job.App.Project, Endpoint: endpoint,
+		ID: job.TargetID, Provider: "docker",
+		// The job's App carries the real project; it lands in both fields so
+		// projectOf takes the Project branch and older readers of Region
+		// agree with it.
+		Project: job.App.Project, Region: job.App.Project,
+		Endpoint: endpoint,
 	}
 
 	// The resolved values arrived with this job and live only in these
