@@ -16,6 +16,7 @@ import { after, before, describe, test } from 'node:test'
 // Imported from outside server/routes because Tachyon treats every file
 // under routes/ as a handler and refuses ones it cannot execute (TY2003).
 import { Handler } from '../server/routes/gateway/yon.js'
+import { call } from '../server/controlplane/client.js'
 
 const COOKIE = 'hd_session=ses_1.secret'
 
@@ -173,5 +174,55 @@ describe('the gateway reports', () => {
     } finally {
       process.chdir(previous)
     }
+  })
+})
+
+
+describe('bounded control-plane transport', () => {
+  test('rejects an oversized UTF-8 request before opening an upstream call', async () => {
+    received = []
+    const response = await Handler.POST(
+      request({ method: 'POST', path: '/api/v1/repos', body: { blob: '界'.repeat(400_000) } }),
+    )
+    assert.equal(response.status, 413)
+    assert.equal(received.length, 0)
+  })
+
+  test('rejects oversized responses rather than returning truncated success', async (t) => {
+    let attempts = 0
+    const endpoint = http.createServer((incoming, response) => {
+      attempts++
+      response.writeHead(200, { 'content-type': 'application/json' })
+      response.write('{"payload":"')
+      response.end('x'.repeat(256) + '"}')
+    })
+    await new Promise((resolve) => endpoint.listen(0, '127.0.0.1', resolve))
+    t.after(() => endpoint.close())
+    await assert.rejects(call({ apiURL: `http://127.0.0.1:${endpoint.address().port}`, timeoutMs: 1000 }, 'GET', '/result', {}, undefined, 64), /byte limit|before completion/)
+    assert.equal(attempts, 1)
+  })
+
+  test('preserves a complete response exactly at its byte ceiling', async (t) => {
+    const payload = JSON.stringify({ payload: '界' })
+    const endpoint = http.createServer((incoming, response) => response.end(payload))
+    await new Promise((resolve) => endpoint.listen(0, '127.0.0.1', resolve))
+    t.after(() => endpoint.close())
+    const response = await call({ apiURL: `http://127.0.0.1:${endpoint.address().port}`, timeoutMs: 1000 }, 'GET', '/result', {}, undefined, Buffer.byteLength(payload))
+    assert.equal(response.status, 200)
+    assert.equal(response.body, payload)
+  })
+
+  test('rejects an interrupted response rather than hanging until its deadline', async (t) => {
+    let attempts = 0
+    const endpoint = http.createServer((incoming, response) => {
+      attempts++
+      response.writeHead(200, { 'content-length': 1024 })
+      response.write('incomplete')
+      setImmediate(() => response.destroy())
+    })
+    await new Promise((resolve) => endpoint.listen(0, '127.0.0.1', resolve))
+    t.after(() => endpoint.close())
+    await assert.rejects(call({ apiURL: `http://127.0.0.1:${endpoint.address().port}`, timeoutMs: 1000 }, 'GET', '/result', {}, undefined, 2048), /before completion|aborted|socket hang up/)
+    assert.equal(attempts, 1)
   })
 })

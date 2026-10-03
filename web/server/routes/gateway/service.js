@@ -128,7 +128,7 @@ export async function relay(settings, bearer, call) {
   let payload
   if (call.body !== undefined && call.body !== null && method !== 'GET') {
     payload = JSON.stringify(call.body)
-    if (payload.length > MAX_BODY_BYTES) {
+    if (Buffer.byteLength(payload) > MAX_BODY_BYTES) {
       return { refusal: { status: 413, code: 'HD0605', message: 'the request body is too large' } }
     }
     headers['content-type'] = 'application/json'

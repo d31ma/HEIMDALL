@@ -89,8 +89,14 @@ export function call(settings, method, path, headers, body, maxResponseBytes) {
       let size = 0
       response.on('data', (chunk) => {
         size += chunk.length
-        if (size <= maxResponseBytes) chunks.push(chunk)
+        if (size > maxResponseBytes) {
+          response.destroy(new Error('the control plane response exceeds the byte limit'))
+          return
+        }
+        chunks.push(chunk)
       })
+      response.on('error', reject)
+      response.on('aborted', () => reject(new Error('the control plane response ended before completion')))
       response.on('end', () =>
         resolve({ status: response.statusCode, body: Buffer.concat(chunks).toString('utf8') }),
       )
