@@ -21,10 +21,10 @@ func (i Identity) name() string {
 	raw := fmt.Sprintf("hd-%s-%s-%s", i.App.Project, i.App.App, i.Service)
 	name := regexp.MustCompile(`[^A-Za-z0-9_-]`).ReplaceAllString(raw, "-")
 	sum := sha256.Sum256([]byte(raw))
-	if len(name) > 51 {
-		name = name[:51]
+	if len(name) > (functionLimits{}).NameLength() {
+		name = name[:(functionLimits{}).NameLength()]
 	}
-	return fmt.Sprintf("%s-%x", name, sum[:6])
+	return fmt.Sprintf("%s-%x", name, sum[:(functionLimits{}).NameDigestBytes()])
 }
 
 func (i Identity) Owns(tags map[string]string) bool {
@@ -32,7 +32,7 @@ func (i Identity) Owns(tags map[string]string) bool {
 }
 
 func (i Identity) owns(tags map[string]string) bool {
-	return tags["dev.delma.heimdall.managed-by"] == "heimdall" && tags["dev.delma.heimdall.project"] == i.App.Project && tags["dev.delma.heimdall.app"] == i.App.App && (i.Service == "" || tags["dev.delma.heimdall.service"] == i.Service)
+	return tags[(ownershipLabels{}).Manager()] == (ownershipLabels{}).ManagerValue() && tags[(ownershipLabels{}).Project()] == i.App.Project && tags[(ownershipLabels{}).App()] == i.App.App && (i.Service == "" || tags[(ownershipLabels{}).Service()] == i.Service)
 }
 
 func (i Identity) Tags(plan provider.Plan, service spec.Service, version string) (map[string]string, error) {
@@ -44,5 +44,5 @@ func (i Identity) tags(plan provider.Plan, service spec.Service, version string)
 	if err != nil {
 		return nil, err
 	}
-	return map[string]string{"dev.delma.heimdall.managed-by": "heimdall", "dev.delma.heimdall.project": i.App.Project, "dev.delma.heimdall.app": i.App.App, "dev.delma.heimdall.service": i.Service, "dev.delma.heimdall.revision": plan.Revision, "dev.delma.heimdall.service-hash": hash, "dev.delma.heimdall.spec-hash": plan.SpecHash, "dev.delma.heimdall.function-version": version}, nil
+	return map[string]string{(ownershipLabels{}).Manager(): (ownershipLabels{}).ManagerValue(), (ownershipLabels{}).Project(): i.App.Project, (ownershipLabels{}).App(): i.App.App, (ownershipLabels{}).Service(): i.Service, (ownershipLabels{}).Revision(): plan.Revision, (ownershipLabels{}).ServiceHash(): hash, (ownershipLabels{}).SpecHash(): plan.SpecHash, (ownershipLabels{}).Version(): version}, nil
 }

@@ -1,3 +1,5 @@
+import FunctionDisplay from '/shared/scripts/FunctionDisplay.js'
+import FunctionInvocation from '/shared/scripts/FunctionInvocation.js'
 import { api, session, tone, shortRevision } from '/shared/scripts/api.js'
 import { paginate, pageFromEvent } from '/shared/scripts/pager.js'
 
@@ -63,6 +65,13 @@ export default class AppPage {
     this.instances = []
     this.visibleInstances = []
     this.noInstances = true
+ this.functions = []
+ this.noFunctions = true
+ this.hasDirectFunctions = false
+ this.pickedFunction = ''
+ this.functionPayload = '{}'
+ this.invoking = false
+ this.functionResult = { error: '', output: '', version: '', requestID: '', outcome: '' }
     /** @type {ActivityRow[]} Every entry held, newest first. */
     this.activity = []
     /** @type {ActivityRow[]} The page the table shows. */
@@ -189,7 +198,10 @@ export default class AppPage {
    * @returns {void}
    */
   fold(detail, history, instances, events) {
-    const status = detail.status || {}
+    this.functions = FunctionDisplay.rows(detail)
+ this.noFunctions = FunctionDisplay.empty(this.functions)
+ this.hasDirectFunctions = FunctionDisplay.invokable(this.functions)
+ const status = detail.status || {}
     this.status = {
       chips: [chip(status.sync_status), chip(status.health)],
       desired: shortRevision(status.desired_revision),
@@ -281,6 +293,7 @@ export default class AppPage {
         health: live.health || 'Missing',
         ready: runningByService[service.name] || 0,
         replicas: service.replicas || 1,
+ function: service.function,
       }
     })
     return {
@@ -530,4 +543,14 @@ export default class AppPage {
     await session.logout()
     window.location.href = '/'
   }
+  pickFunction(event) { this.pickedFunction = event.target.value }
+  editFunctionPayload(event) { this.functionPayload = event.target.value }
+  async invokeFunction() {
+    this.invoking = true
+    await this.rerender()
+    this.functionResult = await FunctionInvocation.send(api, { project: this.project, app: this.app, service: this.pickedFunction, text: this.functionPayload })
+    this.invoking = false
+    await this.rerender()
+  }
+
 }

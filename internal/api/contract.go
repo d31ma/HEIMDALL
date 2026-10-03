@@ -41,6 +41,7 @@ func OpenAPI(version string) ([]byte, error) {
 			"responses":           authorizedResponses(),
 			"x-heimdall-mutating": route.Method != http.MethodGet && route.Method != http.MethodHead,
 		}
+		(invocationContract{}).Apply(operation, route)
 		parameters := append(pathParameters(route.Pattern), queryParameters(route)...)
 		if len(parameters) > 0 {
 			operation["parameters"] = parameters
@@ -176,6 +177,15 @@ var routeQuery = map[string][]queryParameter{
 		{"service", "string", "Narrows to one compose service."},
 		{"tail", "integer", "How many trailing lines. Defaults to 200."},
 		{"follow", "boolean", "true streams as lines arrive rather than returning the tail."},
+	},
+	"GET /api/v1/projects/{project}/apps/{app}/services/{service}/metrics": {
+		{"version", "string", "Immutable native function version. Absent resolves the actually observed ready version."},
+		{"window", "string", "Positive Go duration, such as 15m or 24h. Absent defaults to the native one-hour window. Native Lambda telemetry accepts at most 24h. No execution instance ID is required."},
+	},
+	"GET /api/v1/projects/{project}/apps/{app}/services/{service}/logs": {
+		{"version", "string", "Immutable native function version. Absent resolves the actually observed ready version."},
+		{"tail", "integer", "Bounded native event tail. Defaults to 200. The response is finite and does not follow new events."},
+		{"since", "string", "RFC3339 timestamp. Native provider retention and query bounds apply."},
 	},
 	"GET /api/v1/audit": {
 		{"limit", "integer", "How many entries per page. Defaults to 100."},

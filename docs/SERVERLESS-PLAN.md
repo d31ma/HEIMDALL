@@ -1,6 +1,7 @@
 # Serverless workload providers
 
-Status: approved first-slice design; adapter and runtime qualification pending.
+Status: local provider protocol checkpoint `7bb10d8` passed. Registration, API/UI
+integration and method-cohesion continuation are source candidates pending validation.
 Research checked against official provider documentation on 2026-10-03.
 
 The project is DELMA/HEIMDALL. The working baseline includes existing uncommitted
@@ -178,9 +179,11 @@ with the Lambda Runtime Interface Emulator and Azure Functions host where
 those runtimes are available. Those tests establish local runtime behavior,
 not live-cloud qualification.
 
-Tachyon qualification uses immutable compiler 27, source
-`92f45321c4da369cc0461a9db9502b96cccef4f4`, SHA-256
-`657ca58ba18b59d9effdbabc07dea4ebcd59086fa6935a1991822c43568cc3f3`.
+Tachyon qualification uses immutable compiler 28, source
+`1c948dde96c620f522b4f7c8efb71ced1aa0aca7`, SHA-256
+`cadfafef03721b0cec06647449a276bff0b7d3dacd6b53d8ac63e6c799e1bf63`.
+Its qualified manifest and exact bytes were verified; HEIMDALL bundle/browser
+compatibility has not yet been tested.
 Fresh bundle and browser checks preserve the existing cookie/BFF boundary.
 Do not substitute a compiler candidate. Run each build/test only after the
 coordinating task grants the shared machine lane.
@@ -271,3 +274,31 @@ Sources: [Container Apps metrics](https://learn.microsoft.com/en-us/azure/azure-
 [collection configuration](https://learn.microsoft.com/en-us/azure/azure-functions/configure-monitoring),
 [AppRequests schema](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/tables/apprequests),
 [resource-query permissions](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/api/azure-resource-queries).
+
+
+## Integration candidate after the provider checkpoint
+
+The isolated branch now registers Lambda and Azure Functions, validates native
+routing before agent dispatch and target/registry writes, and uses a shared
+first-error sequence model for cohesive provider orchestration. This candidate
+has not yet compiled or passed tests; the preceding local SDK protocol passes
+apply only to `7bb10d8`.
+
+The API adds the declared-service invocation route above using the existing
+SESAME `app:run` action. Input is limited to 256 KiB JSON and a 384 KiB envelope;
+the wait ends after 45 seconds. Unknown SDK errors are redacted. The request
+cannot select a target or native version, and input is not persisted.
+
+Native observations use service/version `/metrics` and `/logs` routes and the
+existing observation actions. Missing versions resolve from actual provider
+read-back; absent read-back is a conflict, never an invented version. Log reads
+are finite, bounded to 4 MiB and closed even on failure. Lambda supplies native
+version-scoped telemetry. Azure has no qualified FunctionObserver contract yet
+and returns an explicit unavailable result.
+
+The application page projects declared function contracts and observed versions,
+keeps empty execution inventory separate from deployment health, and offers one
+JSON invocation for the Lambda contract without retry. Ordinary and scheduled
+workload behavior remains under regression checks. New API, source-cohesion and
+browser checks require the next coordinated validation slot. Generated contract
+files will be updated only through `heimdall contract` in that slot.

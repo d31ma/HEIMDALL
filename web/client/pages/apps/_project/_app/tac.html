@@ -82,10 +82,38 @@
         </dl>
       </section>
 
+      <if :when="!noFunctions">
+        <section class="hd-section mb-[1.6rem]" aria-labelledby="hd-functions-title">
+          <h2 id="hd-functions-title" class="hd-h2 text-[1.15rem] mt-[1.6rem] mb-[0.6rem]">Functions</h2>
+          <p class="hd-muted">Deployment readiness is independent of active execution instances. Idle functions can scale to zero.</p>
+          <table class="w-table w-table--dense">
+            <thead><tr><th>Function</th><th>Runtime</th><th>Deployment</th><th>Observed version</th></tr></thead>
+            <tbody><loop :for="functionRow of functions"><tr><td>{functionRow.name}</td><td>{functionRow.runtime}</td><td>{functionRow.health}</td><td><code>{functionRow.version}</code></td></tr></loop></tbody>
+          </table>
+          <if :when="hasDirectFunctions"><div>
+            <label class="block my-3">Direct JSON invocation
+              <select id="hd-function" class="w-input" :value="pickedFunction" on:change="pickFunction($event)">
+                <option value="">Choose a function</option>
+                <loop :for="functionRow of functions"><if :when="functionRow.canInvoke"><option :value="functionRow.name">{functionRow.name}</option></if></loop>
+              </select>
+            </label>
+            <label class="block my-3" for="hd-function-payload">JSON payload (up to 256 KiB)</label>
+            <textarea id="hd-function-payload" class="w-input block w-full font-mono" rows="5" :value="functionPayload" on:input="editFunctionPayload($event)"></textarea>
+            <button id="hd-function-invoke" type="button" class="w-btn w-btn-filled w-btn-primary" :disabled="invoking" on:click="invokeFunction()">Invoke once</button>
+            <p class="hd-muted">The wait ends after 45 seconds; execution may continue. Requests are never retried automatically. HTTP functions use their configured native endpoint.</p>
+          </div></if>
+          <if :when="functionResult.error"><div class="w-alert w-alert--color-error" role="alert">{functionResult.error}</div></if>
+          <if :when="functionResult.output">
+            <p role="status">{functionResult.outcome} · version {functionResult.version} · request {functionResult.requestID}</p>
+            <pre id="hd-function-result" class="overflow-auto max-h-96 p-3 rounded-md bg-[var(--w-surface,#fff)]">{functionResult.output}</pre>
+          </if>
+        </section>
+      </if>
+
       <section class="hd-section mb-[1.6rem]">
-        <h2 class="hd-h2 text-[1.15rem] mt-[1.6rem] mb-[0.6rem]">Instances</h2>
+        <h2 class="hd-h2 text-[1.15rem] mt-[1.6rem] mb-[0.6rem]">Resources</h2>
         <if :when="noInstances">
-          <p class="hd-muted">Nothing is running</p>
+          <p class="hd-muted">No execution instances are reported.</p>
         </if>
         <div class="hd-toolbar flex items-center justify-between gap-4 flex-wrap mb-[0.8rem]">
           <div class="hd-viewswitch flex gap-[0.35rem]" role="tablist" aria-label="view">

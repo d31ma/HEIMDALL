@@ -5,7 +5,7 @@ import "github.com/d31ma/heimdall/internal/provider"
 type capabilitySet struct{}
 
 func (capabilitySet) build() provider.Capabilities {
-	capabilities := provider.Capabilities{Provider: "azurefunctions", Support: map[provider.Feature]provider.Support{}, Caveats: map[provider.Feature]string{}}
+	capabilities := provider.Capabilities{Provider: (functionContract{}).providerName(), Support: map[provider.Feature]provider.Support{}, Caveats: map[provider.Feature]string{}}
 	for _, feature := range provider.Features {
 		capabilities.Support[feature] = provider.Rejected
 		capabilities.Caveats[feature] = "the initial Functions v4 HTTP image contract does not express this container directive"

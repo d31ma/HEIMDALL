@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/aws/smithy-go/encoding/cbor"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -35,6 +36,17 @@ type protocol struct {
 	logInput            map[string]any
 	ownershipLossAt     string
 	publicationConflict bool
+	metricFault         string
+	metricPageMode      string
+	metricRequests      int
+	streamNames         []string
+	streamNext          string
+	streamRequests      int
+	logMessages         []string
+	logNext             string
+	logRequests         int
+	versionPages        []map[string]any
+	versionRequests     int
 }
 
 func newProtocol(t *testing.T) *protocol {
@@ -61,6 +73,11 @@ func (p *protocol) reset() {
 	p.oversizedResponse = false
 	p.ownershipLossAt = ""
 	p.publicationConflict = false
+	p.metricFault, p.metricPageMode = "", ""
+	p.metricRequests = 0
+	p.streamNames, p.streamNext, p.streamRequests = nil, "", 0
+	p.logMessages, p.logNext, p.logRequests = nil, "", 0
+	p.versionPages, p.versionRequests = nil, 0
 }
 
 func (p *protocol) clone(input map[string]any) map[string]any {
@@ -78,22 +95,80 @@ func (p *protocol) serve(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Amzn-Requestid", "fixture-request")
 	if strings.HasSuffix(r.URL.Path, "/operation/GetMetricData") {
 		p.metricInput, _ = io.ReadAll(r.Body)
+		p.metricRequests++
 		results := cbor.List{}
 		for _, id := range []string{"invocations", "errors", "throttles", "duration"} {
-			results = append(results, cbor.Map{"Id": cbor.String(id), "StatusCode": cbor.String("Complete"), "Timestamps": cbor.List{&cbor.Tag{ID: 1, Value: cbor.Uint(time.Now().Unix())}}, "Values": cbor.List{cbor.Float64(2)}})
+			if p.metricFault == "missing" && id == "duration" {
+				continue
+			}
+			status := "Complete"
+			timestamps := cbor.List{&cbor.Tag{ID: 1, Value: cbor.Uint(time.Now().Unix())}}
+			values := cbor.List{cbor.Float64(2)}
+			switch p.metricFault {
+			case "partial":
+				status = "PartialData"
+			case "internal":
+				status = "InternalError"
+			case "unknown":
+				id = "unexpected"
+			case "identifier":
+				id = ""
+			case "length":
+				timestamps = cbor.List{}
+			case "nan":
+				values = cbor.List{cbor.Float64(math.NaN())}
+			case "infinity":
+				values = cbor.List{cbor.Float64(math.Inf(1))}
+			}
+			results = append(results, cbor.Map{"Id": cbor.String(id), "StatusCode": cbor.String(status), "Timestamps": timestamps, "Values": values})
+		}
+		if p.metricFault == "empty" {
+			results = cbor.List{}
+		}
+		response := cbor.Map{"MetricDataResults": results}
+		switch p.metricPageMode {
+		case "repeat":
+			response["NextToken"] = cbor.String("again")
+		case "exhaust":
+			response["NextToken"] = cbor.String(fmt.Sprint(p.metricRequests))
 		}
 		w.Header().Set("Smithy-Protocol", "rpc-v2-cbor")
 		w.Header().Set("Content-Type", "application/cbor")
-		_, _ = w.Write(cbor.Encode(cbor.Map{"MetricDataResults": results}))
+		_, _ = w.Write(cbor.Encode(response))
 		return
 	}
 	if r.Header.Get("X-Amz-Target") == "Logs_20140328.DescribeLogStreams" {
-		_ = json.NewEncoder(w).Encode(map[string]any{"logStreams": []map[string]string{{"logStreamName": "2026/10/03/[1]invocation"}, {"logStreamName": "2026/10/03/[2]other"}}})
+		p.streamRequests++
+		streams := []map[string]string{{"logStreamName": "2026/10/03/[1]invocation"}, {"logStreamName": "2026/10/03/[2]other"}}
+		if p.streamNames != nil {
+			streams = []map[string]string{}
+			for _, name := range p.streamNames {
+				streams = append(streams, map[string]string{"logStreamName": name})
+			}
+		}
+		response := map[string]any{"logStreams": streams}
+		if p.streamNext != "" {
+			response["nextToken"] = p.streamNext
+		}
+		_ = json.NewEncoder(w).Encode(response)
 		return
 	}
 	if r.Header.Get("X-Amz-Target") == "Logs_20140328.FilterLogEvents" {
+		p.logRequests++
 		_ = json.NewDecoder(r.Body).Decode(&p.logInput)
-		_ = json.NewEncoder(w).Encode(map[string]any{"events": []map[string]any{{"message": "version one output", "timestamp": time.Now().UnixMilli(), "eventId": "fixture-event"}}})
+		messages := []string{"version one output"}
+		if p.logMessages != nil {
+			messages = p.logMessages
+		}
+		events := []map[string]any{}
+		for _, message := range messages {
+			events = append(events, map[string]any{"message": message, "timestamp": time.Now().UnixMilli(), "eventId": "fixture-event"})
+		}
+		response := map[string]any{"events": events}
+		if p.logNext != "" {
+			response["nextToken"] = p.logNext
+		}
+		_ = json.NewEncoder(w).Encode(response)
 		return
 	}
 	path := strings.TrimPrefix(r.URL.Path, "/2015-03-31/functions")
@@ -202,6 +277,15 @@ func (p *protocol) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(parts) > 1 && parts[1] == "versions" {
 		if r.Method == "GET" {
+			p.versionRequests++
+			if len(p.versionPages) > 0 {
+				index := p.versionRequests - 1
+				if index >= len(p.versionPages) {
+					index = len(p.versionPages) - 1
+				}
+				_ = json.NewEncoder(w).Encode(p.versionPages[index])
+				return
+			}
 			versions := []map[string]any{}
 			for _, version := range p.versions[name] {
 				versions = append(versions, version)

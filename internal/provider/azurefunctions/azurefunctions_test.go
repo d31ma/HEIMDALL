@@ -173,7 +173,7 @@ func TestAcceptedTemplateWithOldEqualRevisionNamesCannotConverge(t *testing.T) {
 		t.Fatalf("old immutable revision was hidden during planning: %+v %v", replan, err)
 	}
 	live, err := adapter.Observe(context.Background(), testTarget(), initial.App)
-	if err != nil || live.Services["one"].Health != provider.Progressing || live.Services["one"].Image != oldImage {
+	if err != nil || live.Services["one"].Health != provider.Progressing || live.Services["one"].Image != oldImage || live.Services["one"].FunctionVersion != oldRevision {
 		t.Fatalf("observation hid the actual old ready revision image or reported healthy: %+v %v", live, err)
 	}
 	server.mu.Lock()
@@ -368,5 +368,48 @@ func TestStaleRevisionCancellationAndFailedProvisioning(t *testing.T) {
 				t.Fatal("failure/cancellation crossed into the next wave")
 			}
 		})
+	}
+}
+
+func TestTargetDefinitionValidationIsPureAndAllowsUnassignedID(t *testing.T) {
+	adapter := &Provider{}
+	target := testTarget()
+	target.ID = ""
+	if err := adapter.ValidateTargetDefinition(target); err != nil {
+		t.Fatalf("valid unstored target rejected: %v", err)
+	}
+	if _, err := parseTarget(target); err == nil {
+		t.Fatal("operation accepted an unassigned target ID")
+	}
+	target.Config["concurrency"] = "value-must-not-appear"
+	err := adapter.ValidateTargetDefinition(target)
+	var diagnostic *AdapterError
+	if !errors.As(err, &diagnostic) || diagnostic.DiagnosticCode() != "HD0470" || strings.Contains(diagnostic.DiagnosticMessage(), "value-must-not-appear") {
+		t.Fatalf("pure configuration validation lost safe diagnostic: %v", err)
+	}
+}
+
+func TestAdapterDiagnosticMessageExcludesCause(t *testing.T) {
+	cause := errors.New("private SDK detail")
+	diagnostic := &AdapterError{Code: "HD0473", Message: "safe adapter message", Cause: cause}
+	if diagnostic.DiagnosticCode() != "HD0473" || diagnostic.DiagnosticMessage() != "safe adapter message" || !errors.Is(diagnostic, cause) {
+		t.Fatal("diagnostic projection must preserve a safe message and wrapped cause")
+	}
+}
+
+func TestMissingReadyRevisionLeavesVersionAndImageUnobserved(t *testing.T) {
+	adapter, server := newProtocolServer(t)
+	plan := applySpec(t, adapter, functionSpec("missing-readback"))
+	server.mu.Lock()
+	server.revisions = map[string]*nativeRevision{}
+	server.mu.Unlock()
+	state, err := adapter.Observe(context.Background(), testTarget(), plan.App)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, service := range state.Services {
+		if service.FunctionVersion != "" || service.Image != "" || service.Health != provider.Progressing {
+			t.Fatalf("absent immutable revision was invented: %+v", service)
+		}
 	}
 }

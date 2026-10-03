@@ -14,5 +14,5 @@ type nativeApp struct {
 }
 
 func (app *nativeApp) tagValue(name string) string {
-	return (optionalValue[string]{}).read(app.Tags[(resourceIdentity{}).tag(name)])
+	return (resourceTags{}).value(app.Tags, name)
 }

@@ -1,7 +1,10 @@
 # Native Azure Functions adapter source
 
-Status: source implemented, unregistered and uncompiled. Tests have not been
-executed. No Functions image or live Azure account is qualified by this work.
+Status: source remains unregistered and live Azure qualification is absent. The
+parent reports Azure, Lambda, all-provider and Node tests passed at checkpoint
+`7bb10d847fd7559537b4aa4cb31febe4bff7ab10`. The subsequent cohesion refactor and
+new diagnostic/target-definition/version assertions are source-only: they have
+not been compiled or tested. No Functions image is qualified by this work.
 
 The adapter uses the pinned azcore ARM pipeline and armappcontainers/v3 models,
 adding a typed resource envelope for `kind=functionapp` at API `2026-07-01`.
@@ -46,7 +49,7 @@ Health describes deployment readiness. Instance inventory is empty because
 execution inventory is not implemented. Revision replica counts are read only
 to distinguish readiness at scale zero; they do not become execution instances
 or a separate observed replica inventory. Observed images come from the
-immutable ready revision; an absent revision leaves the image explicitly
+immutable ready revision, with its read-back name as the function version; an absent revision leaves the image explicitly
 unobserved, and a failed read surfaces an error. An accepted new app template cannot replace that actual
 image while the old revision remains ready.
 Metrics and logs explicitly report that a native function/revision scope is
@@ -63,8 +66,8 @@ KEDA response defaults. Adapter-owned diagnostics are typed `AdapterError`
 values with stable codes and wrapped causes where relevant.
 The added fixtures also exercise ignored-option attacks, immutable old revision
 readback while both app revision names remain equal, application-only revision
-reuse, image reverts, actual revision health and zero-replica state. These tests
-remain unexecuted.
+reuse, image reverts, actual revision health and zero-replica state. Those fixtures passed at the parent-reported checkpoint; execution after the
+current source refactor is pending.
 
 Readiness requires an active, provisioned revision with healthy running or
 processing state. A stopped active provisioned revision is accepted at exactly
@@ -84,13 +87,27 @@ probes) and native Functions behavior remain qualification gates. The existing
 template comparison rejects nonempty probes; automatic probe defaults could
 require a narrowly justified comparison change after provider evidence.
 
-All production source files now have one matching named type. Provider methods
-coordinate private helper types; production free functions and split Provider
-implementations were removed. The strict rule limiting every private helper to
-one decision or one loop is not fully met: comparison, target/workload
-validation, live planning, deployment execution/polling and bounded pagination
-still contain multiple decisions or nested control flow. These require another
-cohesion pass before claiming complete coding-rule compliance.
+All production source files have one matching named type. Public Provider
+methods coordinate private domain units. A source audit counts at most one
+explicit `if`, `switch`, `select` or loop in each production method; there are
+no production free functions, new explanatory comments or file-level variables.
+Target configuration, workload declarations, ARM requests/readback/pagination,
+comparisons, ownership, per-service planning, mutation, polling and observation
+have separate named units. First-error stages use the shared `utils.Steps`
+runner. Changing-state stages use pointer receivers so later steps read actual
+results rather than method-value snapshots. Repeated provider bounds, names,
+configuration keys and resource positions have associated named getters.
+This static audit is not coverage or CRAP-score evidence. Test execution and
+review of boolean decision complexity are still required.
+
+`ValidateTargetDefinition` checks references and allowed configuration without
+credentials or SDK requests and permits an unstored target with no ID; provider
+operations separately require an ID. `AdapterError.DiagnosticCode` and
+`DiagnosticMessage` expose the adapter-owned message without the SDK cause.
+Observation's function version comes from the identified immutable ready
+revision. Missing readback leaves version and image unobserved. Mutation and
+missing-resource response close failures now propagate, and pagination no
+longer discards a base URL parsing error.
 
 Pending: compile and execute tests in the parent-controlled lane; review further
 new API response defaults; qualify

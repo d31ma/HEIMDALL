@@ -39,21 +39,7 @@ func decodeBody(w http.ResponseWriter, r *http.Request, into any) bool {
 // for a 500: a stack of wrapped errors can name internal paths, and the
 // diagnostic code plus the log is the actionable pair.
 func (s *Server) fail(w http.ResponseWriter, err error) {
-	message := err.Error()
-	switch {
-	case strings.Contains(message, "HD0300"):
-		// A capability rejection is the operator's compose file, not a server
-		// fault, and the whole message is the actionable part.
-		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{
-			"code": "HD0300", "message": message,
-		})
-	case strings.HasPrefix(message, "HD02"):
-		writeJSON(w, http.StatusBadRequest, map[string]string{"code": codeOf(message), "message": message})
-	default:
-		writeJSON(w, http.StatusInternalServerError, map[string]string{
-			"code": "HD0500", "message": message,
-		})
-	}
+	(failureResponse{}).Write(w, err)
 }
 
 func codeOf(message string) string {
@@ -199,19 +185,13 @@ func (s *Server) getApp(w http.ResponseWriter, r *http.Request) {
 	// service is doing, but only the rendered spec knows what depends on
 	// what. Best effort — an application that has never rendered simply has
 	// no topology yet.
-	type topologyService struct {
-		Name      string   `json:"name"`
-		Image     string   `json:"image"`
-		DependsOn []string `json:"depends_on,omitempty"`
-		Wave      int      `json:"wave"`
-		Replicas  int      `json:"replicas"`
-	}
+
 	var topology []topologyService
 	if revisions, err := s.Reconcile.Revisions(application.ID, 1); err == nil && len(revisions) > 0 {
 		for _, service := range revisions[0].Spec.Services {
 			topology = append(topology, topologyService{
 				Name: service.Name, Image: service.Image, DependsOn: service.DependsOn,
-				Wave: service.Wave, Replicas: service.Replicas,
+				Wave: service.Wave, Replicas: service.Replicas, Function: service.Function,
 			})
 		}
 	}
@@ -739,31 +719,7 @@ func (s *Server) listTargets(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) createTarget(w http.ResponseWriter, r *http.Request) {
-	var target store.Target
-	if !decodeBody(w, r, &target) {
-		return
-	}
-	if target.Name == "" || target.Provider == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{
-			"code": "HD0400", "message": "name and provider are required",
-		})
-		return
-	}
-	if _, known := s.Providers[target.Provider]; !known {
-		writeJSON(w, http.StatusBadRequest, map[string]string{
-			"code": "HD0400", "message": "no adapter for provider " + target.Provider,
-		})
-		return
-	}
-	target.CreatedAt = s.now()
-
-	id, err := store.In[store.Target](s.Store, store.Targets).Put(target)
-	if err != nil {
-		s.fail(w, err)
-		return
-	}
-	target.ID = id
-	writeJSON(w, http.StatusCreated, target)
+	(&targetCreation{server: s, writer: w, request: r}).Run()
 }
 
 func (s *Server) listRepos(w http.ResponseWriter, r *http.Request) {
@@ -1018,4 +974,15 @@ func (s *Server) listGroupMembers(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"group": group.Name, "targets": members})
+}
+
+func (s *Server) invokeFunction(w http.ResponseWriter, r *http.Request) {
+	(&functionRequest{server: s, writer: w, request: r}).Invoke()
+}
+
+func (s *Server) functionMetrics(w http.ResponseWriter, r *http.Request) {
+	(&functionQuery{server: s, writer: w, request: r}).Metrics()
+}
+func (s *Server) functionLogs(w http.ResponseWriter, r *http.Request) {
+	(&functionQuery{server: s, writer: w, request: r}).Logs()
 }

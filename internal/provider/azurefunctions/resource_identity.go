@@ -3,7 +3,6 @@ package azurefunctions
 import (
 	"crypto/sha256"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/d31ma/heimdall/internal/provider"
@@ -11,33 +10,55 @@ import (
 
 type resourceIdentity struct{}
 
-func (resourceIdentity) tag(name string) string { return "dev.delma.heimdall." + name }
+func (resourceIdentity) tag(name string) string { return (resourceTags{}).key(name) }
 
 func (resourceIdentity) name(app provider.AppRef, service string) string {
-	name := strings.ToLower("hdf-" + app.Project + "-" + app.App + "-" + service)
-	name = strings.Map(func(character rune) rune {
-		if character >= 'a' && character <= 'z' || character >= '0' && character <= '9' {
-			return character
-		}
-		return '-'
-	}, name)
-	digest := sha256.Sum256([]byte(app.Project + "\x00" + app.App + "\x00" + service))
-	if len(name) > 21 {
-		name = name[:21]
-	}
-	return strings.TrimRight(name, "-") + "-" + fmt.Sprintf("%x", digest[:5])
+	name := strings.ToLower("hdf-" + app.Project + (resourceIdentity{}).nameSeparator() + app.App + (resourceIdentity{}).nameSeparator() + service)
+	name = strings.Map((resourceIdentity{}).nameCharacter, name)
+
+	digest := sha256.Sum256([]byte(app.Project + (functionContract{}).separator() + app.App + (functionContract{}).separator() + service))
+	name = (resourceIdentity{}).shortName(name)
+	return strings.TrimRight(name, (resourceIdentity{}).nameSeparator()) + (resourceIdentity{}).nameSeparator() + fmt.Sprintf("%x", digest[:(resourceIdentity{}).digestBytes()])
 }
 
-func (resourceIdentity) owned(app *nativeApp, reference provider.AppRef) bool {
-	return app != nil && app.tagValue("managed-by") == "heimdall" && app.tagValue("provider") == "azurefunctions" && app.tagValue("project") == reference.Project && app.tagValue("app") == reference.App && app.tagValue("service") != ""
+func (r resourceIdentity) owned(app *nativeApp, reference provider.AppRef) bool {
+	value := (appValues{}).read(app)
+	return (comparisonChecks{}).all([]bool{app != nil, value.tagValue(r.managedTag()) == r.manager(), value.tagValue(r.providerTag()) == (functionContract{}).providerName(), value.tagValue(r.projectTag()) == reference.Project, value.tagValue(r.appTag()) == reference.App, value.tagValue(r.serviceTag()) != ""})
 }
 
 func (resourceIdentity) reference(reference, subscription, resourceType string) (string, error) {
-	parts := strings.Split(reference, "/")
-	typeParts := strings.Split(resourceType, "/")
-	validName := regexp.MustCompile(`^[a-zA-Z0-9_.()-]{1,90}$`)
-	if len(parts) != 9 || parts[0] != "" || !strings.EqualFold(parts[1], "subscriptions") || !strings.EqualFold(parts[2], subscription) || !strings.EqualFold(parts[3], "resourceGroups") || !validName.MatchString(parts[4]) || !strings.EqualFold(parts[5], "providers") || !strings.EqualFold(parts[6], typeParts[0]) || !strings.EqualFold(parts[7], typeParts[1]) || !validName.MatchString(parts[8]) {
-		return "", (&AdapterError{Code: "HD0470", Message: fmt.Sprintf("expected an existing %s ARM resource ID in the target subscription", resourceType)})
-	}
-	return parts[8], nil
+	return (resourceReference{}).name(reference, subscription, resourceType)
 }
+
+func (resourceIdentity) nameCharacter(character rune) rune {
+	if character >= 'a' && character <= 'z' || character >= '0' && character <= '9' {
+		return character
+	}
+	return '-'
+}
+func (r resourceIdentity) shortName(name string) string {
+	if len(name) > r.namePrefixLimit() {
+		return name[:r.namePrefixLimit()]
+	}
+	return name
+}
+func (resourceIdentity) namePrefixLimit() int { return 21 }
+func (resourceIdentity) digestBytes() int     { return 5 }
+func (resourceIdentity) project(project string) string {
+	if project == "" {
+		return (functionContract{}).defaultProject()
+	}
+	return project
+}
+
+func (resourceIdentity) managedTag() string     { return "managed-by" }
+func (resourceIdentity) providerTag() string    { return "provider" }
+func (resourceIdentity) projectTag() string     { return "project" }
+func (resourceIdentity) appTag() string         { return "app" }
+func (resourceIdentity) serviceTag() string     { return "service" }
+func (resourceIdentity) revisionTag() string    { return "revision" }
+func (resourceIdentity) serviceHashTag() string { return "service-hash" }
+func (resourceIdentity) specHashTag() string    { return "spec-hash" }
+func (resourceIdentity) manager() string        { return "heimdall" }
+
+func (resourceIdentity) nameSeparator() string { return "-" }

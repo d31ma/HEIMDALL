@@ -176,11 +176,12 @@ type LiveState struct {
 
 // ServiceState is one service as the runtime sees it.
 type ServiceState struct {
-	Health   Health `json:"health"`
-	Replicas int    `json:"replicas"`
-	Ready    int    `json:"ready"`
-	Image    string `json:"image"`
-	Message  string `json:"message,omitempty"`
+	FunctionVersion string `json:"function_version,omitempty"`
+	Health          Health `json:"health"`
+	Replicas        int    `json:"replicas"`
+	Ready           int    `json:"ready"`
+	Image           string `json:"image"`
+	Message         string `json:"message,omitempty"`
 
 	// The scheduled-service fields. They are empty for an ordinary service,
 	// and the five Health values are reused rather than extended: a failed

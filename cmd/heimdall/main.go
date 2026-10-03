@@ -28,10 +28,6 @@ import (
 	"github.com/d31ma/heimdall/internal/git"
 	"github.com/d31ma/heimdall/internal/observe"
 	"github.com/d31ma/heimdall/internal/provider"
-	"github.com/d31ma/heimdall/internal/provider/aca"
-	"github.com/d31ma/heimdall/internal/provider/cloudrun"
-	"github.com/d31ma/heimdall/internal/provider/docker"
-	"github.com/d31ma/heimdall/internal/provider/ecs"
 	"github.com/d31ma/heimdall/internal/reconcile"
 	hdregistry "github.com/d31ma/heimdall/internal/registry"
 	hdsecrets "github.com/d31ma/heimdall/internal/secrets"
@@ -687,7 +683,7 @@ func runServe(args []string) error {
 	autoCtx, stopAuto := context.WithCancel(context.Background())
 	defer stopAuto()
 	registryEngine := &hdregistry.Engine{
-		Store: storage, CacheDir: filepath.Join(deployment, "git"), Logger: logger,
+		Store: storage, CacheDir: filepath.Join(deployment, "git"), Logger: logger, Providers: adapters,
 	}
 	auto := &reconcile.Auto{
 		Engine: reconciler, Interval: autoInterval(), Logger: logger,
@@ -831,47 +827,8 @@ func hostOf(rawURL string) string {
 // providers registers the adapters this build ships. Adding one is an edit
 // here and a package under internal/provider/; nothing else in the control
 // plane learns a provider name.
-func providers(secrets func(context.Context, string) (string, error)) (
-	map[string]provider.Provider,
-	map[string]func(context.Context, reconcile.ApplyParams) context.Context,
-) {
-	dockerAdapter := &docker.Provider{SecretResolver: secrets}
-	swarmAdapter := &docker.Swarm{SecretResolver: secrets}
-	ecsAdapter := &ecs.Provider{SecretResolver: secrets}
-	runAdapter := &cloudrun.Provider{SecretResolver: secrets}
-	acaAdapter := &aca.Provider{SecretResolver: secrets}
-
-	applyContext := func(ctx context.Context, params reconcile.ApplyParams) context.Context {
-		return docker.WithApply(ctx, docker.ApplyOptions{
-			Spec: params.Spec, Prune: params.Prune, Registries: params.Registries,
-		})
-	}
-	return map[string]provider.Provider{
-			dockerAdapter.Name(): dockerAdapter,
-			swarmAdapter.Name():  swarmAdapter,
-			ecsAdapter.Name():    ecsAdapter,
-			runAdapter.Name():    runAdapter,
-			acaAdapter.Name():    acaAdapter,
-		}, map[string]func(context.Context, reconcile.ApplyParams) context.Context{
-			dockerAdapter.Name(): applyContext,
-			// Swarm shares the standalone adapter's apply-context shape.
-			swarmAdapter.Name(): applyContext,
-			ecsAdapter.Name(): func(ctx context.Context, params reconcile.ApplyParams) context.Context {
-				return ecs.WithApply(ctx, ecs.ApplyOptions{
-					Spec: params.Spec, Prune: params.Prune, Registries: params.Registries,
-				})
-			},
-			runAdapter.Name(): func(ctx context.Context, params reconcile.ApplyParams) context.Context {
-				return cloudrun.WithApply(ctx, cloudrun.ApplyOptions{
-					Spec: params.Spec, Prune: params.Prune, Registries: params.Registries,
-				})
-			},
-			acaAdapter.Name(): func(ctx context.Context, params reconcile.ApplyParams) context.Context {
-				return aca.WithApply(ctx, aca.ApplyOptions{
-					Spec: params.Spec, Prune: params.Prune, Registries: params.Registries,
-				})
-			},
-		}
+func providers(secrets func(context.Context, string) (string, error)) (map[string]provider.Provider, map[string]func(context.Context, reconcile.ApplyParams) context.Context) {
+	return (providerRegistry{secrets: secrets}).Build()
 }
 
 // auditor writes every authorization decision to hd-audit and mirrors it to

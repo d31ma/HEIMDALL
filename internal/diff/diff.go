@@ -54,7 +54,8 @@ type Change struct {
 
 // ServiceDiff is every difference for one service.
 type ServiceDiff struct {
-	Service string `json:"service"`
+	FunctionVersion string `json:"function_version,omitempty"`
+	Service         string `json:"service"`
 	// Kind is the service-level verdict: added means the desired state
 	// declares it and the deployed revision does not.
 	Kind    ChangeKind      `json:"kind,omitempty"`
@@ -129,6 +130,7 @@ func compareService(want, have spec.Service) []Change {
 		}
 	}
 	scalar("image", want.Image, have.Image)
+	changes = append(changes, (functionDifference{desired: want.Function, live: have.Function}).Changes()...)
 	scalar("restart", want.Restart, have.Restart)
 	scalar("command", strings.Join(want.Command, " "), strings.Join(have.Command, " "))
 	scalar("entrypoint", strings.Join(want.Entrypoint, " "), strings.Join(have.Entrypoint, " "))
@@ -325,7 +327,7 @@ func Report(
 			summary.Services = append(summary.Services, ServiceDiff{
 				Service: name, Health: state.Health, Message: state.Message,
 				Schedule: state.Schedule, LastRunAt: state.LastRunAt,
-				LastRunStatus: state.LastRunStatus, NextRunAt: state.NextRunAt,
+				LastRunStatus: state.LastRunStatus, NextRunAt: state.NextRunAt, FunctionVersion: state.FunctionVersion,
 			})
 			byName[name] = len(summary.Services) - 1
 			continue
@@ -334,6 +336,7 @@ func Report(
 		summary.Services[index].Message = state.Message
 		summary.Services[index].Schedule = state.Schedule
 		summary.Services[index].LastRunAt = state.LastRunAt
+		summary.Services[index].FunctionVersion = state.FunctionVersion
 		summary.Services[index].LastRunStatus = state.LastRunStatus
 		summary.Services[index].NextRunAt = state.NextRunAt
 	}

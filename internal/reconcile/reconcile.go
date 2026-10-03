@@ -14,6 +14,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"path"
 	"sort"
@@ -181,6 +182,9 @@ func (e *Engine) resolveFor(appID, targetOverride string) (resolved, error) {
 		return out, fmt.Errorf("HD0252: no adapter registered for provider %q", target.Provider)
 	}
 
+	if err := (provider.TargetCheck{Adapter: adapter, Target: target.Ref()}).Definition(); err != nil {
+		return out, err
+	}
 	context := resolved{app: app, repository: repository, target: target, adapter: adapter}
 
 	// A target behind an agent is not reachable from here. It resolves to a
@@ -1138,4 +1142,15 @@ func (e *Engine) registryResolver(resolved resolved) provider.RegistryResolver {
 			Server: best.Server, Username: best.Username, Password: password,
 		}, nil
 	}
+}
+
+func (e *Engine) InvokeService(ctx context.Context, request ServiceInvocation) (provider.Invocation, error) {
+	return (&functionInvocation{engine: e, request: request}).Invoke(ctx)
+}
+
+func (e *Engine) FunctionMetrics(ctx context.Context, request ServiceObservation) (provider.FunctionSeries, error) {
+	return (&functionRead{engine: e, request: request}).Metrics(ctx)
+}
+func (e *Engine) FunctionLogs(ctx context.Context, request ServiceObservation) (io.ReadCloser, error) {
+	return (&functionRead{engine: e, request: request}).Logs(ctx)
 }

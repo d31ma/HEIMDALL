@@ -10,6 +10,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/d31ma/heimdall/internal/provider"
+	"github.com/d31ma/heimdall/internal/provider/docker"
+	"github.com/d31ma/heimdall/internal/provider/lambda"
 	"github.com/d31ma/heimdall/internal/registry"
 	"github.com/d31ma/heimdall/internal/store"
 )
@@ -264,5 +267,56 @@ func TestOverlayChangesPropagate(t *testing.T) {
 	apps, _ = store.In[store.Application](w.storage, store.Applications).Find(nil)
 	if len(apps[0].Overlays) != 0 {
 		t.Fatalf("the removed overlay survived on the document: %+v", apps[0].Overlays)
+	}
+}
+
+func TestNativeRegistryValidatesPreservedAgentBeforeDocumentWrites(t *testing.T) {
+	w := newWorld(t)
+	w.engine.Providers = map[string]provider.Provider{"docker": &docker.Provider{}, "lambda": &lambda.Provider{EndpointOverride: "https://must-not-open.example.invalid"}}
+	if _, err := w.engine.Sync(context.Background(), "prn_admin"); err != nil {
+		t.Fatal(err)
+	}
+	targets, err := store.In[store.Target](w.storage, store.Targets).Find(nil)
+	if err != nil || len(targets) != 1 {
+		t.Fatalf("targets: %v %v", targets, err)
+	}
+	if err := store.In[store.Target](w.storage, store.Targets).Patch(targets[0].ID, map[string]any{"agent_id": "preserved-agent"}); err != nil {
+		t.Fatal(err)
+	}
+	native := strings.Replace(manifestV1, "provider: docker\n    endpoint: http://127.0.0.1:2375", "provider: lambda\n    region: us-east-1\n    config:\n      execution_role_arn: arn:aws:iam::123456789012:role/existing\n    tags:\n      stage: initial", 1)
+	native = strings.Replace(native, "- name: shop", "- name: shop\n    description: must-not-persist", 1)
+	w.commitManifest(t, native)
+	if _, err := w.engine.Sync(context.Background(), "prn_admin"); err == nil || !strings.Contains(err.Error(), "HD0410") {
+		t.Fatalf("preserved native agent was accepted: %v", err)
+	}
+	projects, err := store.In[store.Project](w.storage, store.Projects).Find(nil)
+	if err != nil || len(projects) != 1 || projects[0].Description != "" {
+		t.Fatalf("invalid target mutated project: %v %v", projects, err)
+	}
+	targets, err = store.In[store.Target](w.storage, store.Targets).Find(nil)
+	if err != nil || targets[0].Provider != "docker" || targets[0].AgentID != "preserved-agent" {
+		t.Fatalf("invalid target mutated enrollment: %v %v", targets, err)
+	}
+	if err := store.In[store.Target](w.storage, store.Targets).Patch(targets[0].ID, map[string]any{"agent_id": ""}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.engine.Sync(context.Background(), "prn_admin"); err != nil {
+		t.Fatal(err)
+	}
+	targets, err = store.In[store.Target](w.storage, store.Targets).Find(nil)
+	if err != nil || targets[0].Config["execution_role_arn"] != "arn:aws:iam::123456789012:role/existing" || targets[0].Tags["stage"] != "initial" {
+		t.Fatalf("validated config was not persisted: %v %v", targets, err)
+	}
+	w.commitManifest(t, strings.Replace(strings.Replace(native, "role/existing", "role/changed", 1), "stage: initial", "stage: changed", 1))
+	if _, err := w.engine.Sync(context.Background(), "prn_admin"); err != nil {
+		t.Fatal(err)
+	}
+	targets, err = store.In[store.Target](w.storage, store.Targets).Find(nil)
+	if err != nil || targets[0].Config["execution_role_arn"] != "arn:aws:iam::123456789012:role/changed" || targets[0].Tags["stage"] != "changed" {
+		t.Fatalf("native config-only edit failed: %v %v", targets, err)
+	}
+	result, err := w.engine.Sync(context.Background(), "prn_admin")
+	if err != nil || len(result.Changes) != 0 {
+		t.Fatalf("native registry did not converge: %+v %v", result, err)
 	}
 }

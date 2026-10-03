@@ -12,15 +12,20 @@ type TargetContract struct{ Target provider.Target }
 
 func (c TargetContract) Validate() error {
 	keys := c.keys()
-	return errors.Join(c.fields(), c.role(), c.settings(keys))
+	return errors.Join(c.id(), c.definitionFields(), c.role(), c.settings(keys))
 }
 
 func (TargetContract) ExecutionRoleKey() string { return "execution_role_arn" }
 
-func (c TargetContract) fields() error {
-	switch {
-	case c.Target.ID == "":
+func (c TargetContract) id() error {
+	if c.Target.ID == "" {
 		return (Diagnostic{}).Format((Diagnostic{}).TargetCode(), "Lambda target requires an ID")
+	}
+	return nil
+}
+
+func (c TargetContract) definitionFields() error {
+	switch {
 	case c.Target.Provider != (&Provider{}).Name():
 		return (Diagnostic{}).Format((Diagnostic{}).TargetCode(), "Lambda target must name the Lambda provider")
 	case c.Target.Region == "":
@@ -62,4 +67,9 @@ func (c TargetContract) setting(key string) error {
 		return (Diagnostic{}).Format((Diagnostic{}).TargetCode(), "Lambda target setting %s is not implemented; network, concurrency and event-source changes need explicit contracts", key)
 	}
 	return nil
+}
+
+func (c TargetContract) ValidateDefinition() error {
+	keys := c.keys()
+	return errors.Join(c.definitionFields(), c.role(), c.settings(keys))
 }

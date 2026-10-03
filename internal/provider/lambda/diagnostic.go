@@ -33,3 +33,5 @@ func (Diagnostic) ObservationCode() string { return "HD0417" }
 func (Diagnostic) InvocationCode() string { return "HD0418" }
 
 func (Diagnostic) ResponseLimitCode() string { return "HD0419" }
+
+func (d *Diagnostic) DiagnosticMessage() string { return d.Message }

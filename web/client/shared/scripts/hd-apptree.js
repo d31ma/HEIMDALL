@@ -19,6 +19,7 @@
  * @property {string} [health]
  * @property {number} [ready]
  * @property {number} [replicas]
+ * @property {object} [function]
  */
 
 /**
@@ -181,7 +182,7 @@ class HdAppTree extends HTMLElement {
     for (const [depth, list] of [...columns.entries()].sort((a, b) => a[0] - b[0])) {
       for (const service of list.sort((a, b) => a.name.localeCompare(b.name))) {
         const node = {
-          kind: 'svc', id: 'svc:' + service.name, name: service.name,
+          kind: service.function ? 'fn' : 'svc', id: 'svc:' + service.name, name: service.name,
           detail: truncate(service.image, 26), health: service.health || 'Unknown',
           ready: service.ready, replicas: service.replicas,
         }
@@ -237,7 +238,7 @@ class HdAppTree extends HTMLElement {
         fill="none" stroke="${border}" stroke-width="1.5" opacity="${dim ? 0.25 : 1}"/>`
     }).join('')
 
-    const kindLabel = { app: 'APP', svc: 'SVC', pod: 'RUN' }
+    const kindLabel = { app: 'APP', svc: 'SVC', fn: 'FN', pod: 'RUN' }
     const nodeSVG = nodes.map((node) => {
       const color = healthColor(node.health)
       const dim = term && !matches(node)

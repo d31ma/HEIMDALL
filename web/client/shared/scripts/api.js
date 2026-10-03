@@ -75,6 +75,7 @@
  * @property {string} service
  * @property {string} [health]
  * @property {string} [message]
+ * @property {string} [function_version]
  * @property {string} [schedule]
  * @property {string} [next_run_at]
  * @property {string} [last_run_at]
@@ -157,7 +158,7 @@
  * @typedef {object} AppDetail
  * @property {Application} [application]
  * @property {StatusAnswer} [status]
- * @property {{name: string, image?: string, depends_on?: string[], replicas?: number}[]} [topology]
+ * @property {{name: string, image?: string, depends_on?: string[], replicas?: number, function?: {runtime_contract?: string, invocation?: string}}[]} [topology]
  */
 
 /**
@@ -389,6 +390,9 @@ export const api = {
    * @param {string} app
    * @returns {Promise<{instances?: Instance[]}>}
    */
+  invokeFunction: (project, app, service, payload) =>
+    gateway('POST', `/api/v1/projects/${encodeURIComponent(project)}/apps/${encodeURIComponent(app)}/services/${encodeURIComponent(service)}/invoke`, { payload }, { slow: true }),
+
   instances: (project, app) =>
     gateway('GET', `/api/v1/projects/${encodeURIComponent(project)}/apps/${encodeURIComponent(app)}/instances`,
       undefined, { cache: true }),

@@ -2,6 +2,7 @@ package azurefunctions
 
 import (
 	"context"
+
 	"github.com/d31ma/heimdall/internal/spec"
 )
 

@@ -18,6 +18,6 @@ func (c httpClient) do(req *http.Request) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	response.Body = &boundedBody{body: response.Body, remaining: 6 * 1024 * 1024}
+	response.Body = &boundedBody{body: response.Body, remaining: int64((functionLimits{}).PayloadBytes())}
 	return response, nil
 }

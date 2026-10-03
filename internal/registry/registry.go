@@ -19,10 +19,11 @@ import (
 // no grant, no secret value, no agent — the authority boundary ADR 0010
 // draws.
 type Engine struct {
-	Store    *store.Store
-	CacheDir string
-	Logger   *slog.Logger
-	Now      func() time.Time
+	Store     *store.Store
+	Providers map[string]provider.Provider
+	CacheDir  string
+	Logger    *slog.Logger
+	Now       func() time.Time
 }
 
 func (e *Engine) now() time.Time {
@@ -178,6 +179,10 @@ func (e *Engine) Sync(ctx context.Context, principalID string) (Result, error) {
 // repositories and targets, then applications, so every name an application
 // resolves already exists. Deletion runs the other way and is prune-gated.
 func (e *Engine) apply(binding store.RootBinding, manifest Manifest) (Result, error) {
+	return (&manifestApplication{engine: e, binding: binding, manifest: manifest}).Apply()
+}
+
+func (e *Engine) applyDocuments(binding store.RootBinding, manifest Manifest) (Result, error) {
 	result := Result{}
 	change := func(kind provider.OperationKind, what string) {
 		result.Changes = append(result.Changes, provider.Operation{Kind: kind, Service: what})
@@ -297,12 +302,14 @@ func (e *Engine) apply(binding store.RootBinding, manifest Manifest) (Result, er
 			change(provider.OpCreate, "target:"+key)
 		case existing.Provider != decl.Provider || existing.Region != decl.Region ||
 			existing.Endpoint != decl.Endpoint || existing.CredentialRef != decl.CredentialRef ||
+			!maps.Equal(existing.Config, decl.Config) || !maps.Equal(existing.Tags, decl.Tags) ||
 			existing.ManagedBy != store.ManagedByRegistry:
 			// An agent-enrolled target keeps its AgentID: enrollment is not
 			// declarable (ADR 0007), so the sync never touches it.
 			if err := targets.Patch(existing.ID, map[string]any{
 				"provider": decl.Provider, "region": decl.Region,
 				"endpoint": decl.Endpoint, "credential_ref": decl.CredentialRef,
+				"config": decl.Config, "tags": decl.Tags,
 				"managed_by": store.ManagedByRegistry,
 			}); err != nil {
 				return result, err

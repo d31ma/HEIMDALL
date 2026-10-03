@@ -4,49 +4,46 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/appcontainers/armappcontainers/v3"
 	"github.com/d31ma/heimdall/internal/provider"
+	"github.com/d31ma/heimdall/internal/sequence"
 	"github.com/d31ma/heimdall/internal/spec"
 )
 
-type functionDefinition struct{ config targetConfig }
+type functionDefinition struct {
+	config  targetConfig
+	plan    provider.Plan
+	service spec.Service
+	hash    string
+	value   nativeApp
+}
 
 func (d functionDefinition) build(plan provider.Plan, service spec.Service) (nativeApp, error) {
-	config := d.config
-	hash, err := spec.HashService(service)
+	d.plan, d.service = plan, service
+	err := (sequence.Steps{Actions: []func() error{d.hashService, d.define}}).Run()
+	return d.result(err)
+}
+func (d *functionDefinition) hashService() error {
+	hash, err := spec.HashService(d.service)
+	d.hash = hash
+	return err
+}
+func (d *functionDefinition) define() error {
+	contract := functionContract{}
+	d.value = nativeApp{
+		Kind: contract.resourceKind(), Location: to.Ptr(d.config.region), Tags: d.tags(),
+		Identity:   &armappcontainers.ManagedServiceIdentity{Type: to.Ptr(armappcontainers.ManagedServiceIdentityTypeUserAssigned), UserAssignedIdentities: map[string]*armappcontainers.UserAssignedIdentity{d.config.identity: {}}},
+		Properties: &nativeProperties{EnvironmentID: to.Ptr(d.config.environment), Configuration: &armappcontainers.Configuration{ActiveRevisionsMode: to.Ptr(armappcontainers.ActiveRevisionsModeSingle), Ingress: &armappcontainers.Ingress{External: to.Ptr(false), TargetPort: to.Ptr(contract.targetPort()), AllowInsecure: to.Ptr(false), Transport: to.Ptr(armappcontainers.IngressTransportMethodAuto)}}, Template: &nativeTemplate{Containers: []*armappcontainers.Container{{Name: to.Ptr(d.service.Name), Image: to.Ptr(d.service.Image), Env: (hostEnvironment{config: d.config}).build(d.service), Resources: &armappcontainers.ContainerResources{CPU: to.Ptr(d.cpu()), Memory: to.Ptr(d.memory())}}}, Scale: &nativeScale{AllowScalingRuleOverride: to.Ptr(false), MinReplicas: to.Ptr(int32(0)), MaxReplicas: to.Ptr(contract.maximumReplicas())}}},
+	}
+	return nil
+}
+func (d functionDefinition) tags() map[string]*string {
+	identity := resourceIdentity{}
+	return map[string]*string{identity.tag(identity.managedTag()): to.Ptr(identity.manager()), identity.tag(identity.providerTag()): to.Ptr((functionContract{}).providerName()), identity.tag(identity.projectTag()): to.Ptr(d.plan.App.Project), identity.tag(identity.appTag()): to.Ptr(d.plan.App.App), identity.tag(identity.serviceTag()): to.Ptr(d.service.Name), identity.tag(identity.revisionTag()): to.Ptr(d.plan.Revision), identity.tag(identity.serviceHashTag()): to.Ptr(d.hash), identity.tag(identity.specHashTag()): to.Ptr(d.plan.SpecHash)}
+}
+func (functionDefinition) cpu() float64   { return 0.5 }
+func (functionDefinition) memory() string { return "1Gi" }
+func (d functionDefinition) result(err error) (nativeApp, error) {
 	if err != nil {
 		return nativeApp{}, err
 	}
-	environment := []*armappcontainers.EnvironmentVar{
-		{Name: to.Ptr("FUNCTIONS_EXTENSION_VERSION"), Value: to.Ptr("~4")},
-		{Name: to.Ptr("AzureWebJobsStorage__accountName"), Value: to.Ptr(config.storageName)},
-		{Name: to.Ptr("AzureWebJobsStorage__credential"), Value: to.Ptr("managedidentity")},
-		{Name: to.Ptr("AzureWebJobsStorage__clientId"), Value: to.Ptr(config.clientID)},
-	}
-	for _, env := range service.Env {
-		environment = append(environment, &armappcontainers.EnvironmentVar{Name: to.Ptr(env.Key), Value: to.Ptr(env.Value)})
-	}
-	return nativeApp{
-		Kind:     "functionapp",
-		Location: to.Ptr(config.region),
-		Tags: map[string]*string{
-			(resourceIdentity{}).tag("managed-by"): to.Ptr("heimdall"), (resourceIdentity{}).tag("provider"): to.Ptr("azurefunctions"),
-			(resourceIdentity{}).tag("project"): to.Ptr(plan.App.Project), (resourceIdentity{}).tag("app"): to.Ptr(plan.App.App),
-			(resourceIdentity{}).tag("service"): to.Ptr(service.Name), (resourceIdentity{}).tag("revision"): to.Ptr(plan.Revision),
-			(resourceIdentity{}).tag("service-hash"): to.Ptr(hash), (resourceIdentity{}).tag("spec-hash"): to.Ptr(plan.SpecHash),
-		},
-		Identity: &armappcontainers.ManagedServiceIdentity{
-			Type:                   to.Ptr(armappcontainers.ManagedServiceIdentityTypeUserAssigned),
-			UserAssignedIdentities: map[string]*armappcontainers.UserAssignedIdentity{config.identity: {}},
-		},
-		Properties: &nativeProperties{
-			EnvironmentID: to.Ptr(config.environment),
-			Configuration: &armappcontainers.Configuration{
-				ActiveRevisionsMode: to.Ptr(armappcontainers.ActiveRevisionsModeSingle),
-				Ingress:             &armappcontainers.Ingress{External: to.Ptr(false), TargetPort: to.Ptr(int32(80)), AllowInsecure: to.Ptr(false), Transport: to.Ptr(armappcontainers.IngressTransportMethodAuto)},
-			},
-			Template: &nativeTemplate{
-				Containers: []*armappcontainers.Container{{Name: to.Ptr(service.Name), Image: to.Ptr(service.Image), Env: environment, Resources: &armappcontainers.ContainerResources{CPU: to.Ptr(0.5), Memory: to.Ptr("1Gi")}}},
-				Scale:      &nativeScale{AllowScalingRuleOverride: to.Ptr(false), MinReplicas: to.Ptr(int32(0)), MaxReplicas: to.Ptr(int32(10))},
-			},
-		},
-	}, nil
+	return d.value, nil
 }

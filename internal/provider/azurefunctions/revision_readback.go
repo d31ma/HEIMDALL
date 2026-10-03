@@ -2,11 +2,6 @@ package azurefunctions
 
 import (
 	"context"
-	"net/http"
-	"net/url"
-	"regexp"
-	"strings"
-	"time"
 
 	"github.com/d31ma/heimdall/internal/provider"
 )
@@ -15,70 +10,55 @@ type revisionReadback struct{ client *armClient }
 
 func (r revisionReadback) health(ctx context.Context, app *nativeApp, desired nativeApp) (provider.Health, error) {
 	health := (appComparison{}).ready(app)
-	if health != provider.Healthy {
-		return health, nil
+	matches := (appComparison{}).matches(app, desired)
+	revision, err := r.inspectHealthy(ctx, app, health, matches)
+	observed := r.compare(app, desired, revision)
+	return r.result(observed, err)
+}
+func (r revisionReadback) inspectHealthy(ctx context.Context, app *nativeApp, health provider.Health, matches bool) (*nativeRevision, error) {
+	if health != provider.Healthy || !matches {
+		return nil, nil
 	}
-	if !(appComparison{}).matches(app, desired) {
-		return provider.Progressing, nil
+	return r.inspect(ctx, app)
+}
+func (r revisionReadback) inspect(ctx context.Context, app *nativeApp) (*nativeRevision, error) {
+	value := (appValues{}).read(app)
+	properties := (appValues{}).properties(value.Properties)
+	name := (optionalValue[string]{}).read(value.Name)
+	revision := (optionalValue[string]{}).read(properties.LatestReadyRevisionName)
+	available := (comparisonChecks{}).all([]bool{app != nil, value.Properties != nil, revision != ""})
+	return r.readAvailable(ctx, name, revision, available)
+}
+func (r revisionReadback) readAvailable(ctx context.Context, name, revision string, available bool) (*nativeRevision, error) {
+	if !available {
+		return nil, nil
 	}
-	revision, err := r.inspect(ctx, app)
+	return r.read(ctx, name, revision)
+}
+func (revisionReadback) compare(app *nativeApp, desired nativeApp, revision *nativeRevision) provider.Health {
+	health := (appComparison{}).ready(app)
+	properties := (appValues{}).properties(desired.Properties)
+	actual := (revisionComparison{}).value(revision)
+	matches := (comparisonChecks{}).all([]bool{(appComparison{}).matches(app, desired), desired.Properties != nil, (revisionComparison{}).propertiesPresent(revision), (templateComparison{}).matches(actual.Template, properties.Template)})
+	revisionHealth := (revisionComparison{}).ready(revision)
+	return (revisionReadback{}).comparisonResult(health, matches, revisionHealth)
+}
+func (revisionReadback) comparisonResult(health provider.Health, matches bool, revisionHealth provider.Health) provider.Health {
+	switch {
+	case health != provider.Healthy:
+		return health
+	case !matches:
+		return provider.Progressing
+	}
+	return revisionHealth
+}
+func (revisionReadback) result(health provider.Health, err error) (provider.Health, error) {
 	if err != nil {
 		return provider.Progressing, err
 	}
-	return r.compare(app, desired, revision), nil
+	return health, nil
 }
-
-func (r revisionReadback) inspect(ctx context.Context, app *nativeApp) (*nativeRevision, error) {
-	if app == nil || app.Properties == nil || (optionalValue[string]{}).read(app.Properties.LatestReadyRevisionName) == "" {
-		return nil, nil
-	}
-	return r.read(ctx, (optionalValue[string]{}).read(app.Name), (optionalValue[string]{}).read(app.Properties.LatestReadyRevisionName))
-}
-
-func (revisionReadback) compare(app *nativeApp, desired nativeApp, revision *nativeRevision) provider.Health {
-	health := (appComparison{}).ready(app)
-	if health != provider.Healthy {
-		return health
-	}
-	if !(appComparison{}).matches(app, desired) || desired.Properties == nil {
-		return provider.Progressing
-	}
-	if revision == nil || revision.Properties == nil || !(templateComparison{}).matches(revision.Properties.Template, desired.Properties.Template) {
-		return provider.Progressing
-	}
-	return (revisionComparison{}).ready(revision)
-}
-
 func (r revisionReadback) read(ctx context.Context, name, revisionName string) (*nativeRevision, error) {
-	valid := regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,255}$`)
-	if !valid.MatchString(name) || !valid.MatchString(revisionName) {
-		return nil, &AdapterError{Code: "HD0472", Message: "ARM returned an invalid native function or ready revision name"}
-	}
-	endpoint, err := url.Parse(r.client.path(name))
-	if err != nil {
-		return nil, err
-	}
-	endpoint.Path += "/revisions/" + revisionName
-	endpoint.RawPath = ""
-	bounded, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	response, err := r.client.request(bounded, http.MethodGet, endpoint.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-	if response.StatusCode == http.StatusNotFound {
-		response.Body.Close()
-		return nil, nil
-	}
-	if response.StatusCode != http.StatusOK {
-		return nil, (armResponse{response: response}).failure()
-	}
-	var revision nativeRevision
-	if err := (armResponse{response: response}).decode(&revision); err != nil {
-		return nil, err
-	}
-	if (optionalValue[string]{}).read(revision.Name) != revisionName || !strings.EqualFold((optionalValue[string]{}).read(revision.ID), endpoint.Path) {
-		return nil, &AdapterError{Code: "HD0472", Message: "ARM ready revision response does not identify the requested resource"}
-	}
-	return &revision, nil
+	resource := revisionResource{client: r.client, name: name, revisionName: revisionName}
+	return resource.read(ctx)
 }

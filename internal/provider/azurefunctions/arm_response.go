@@ -5,25 +5,34 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/d31ma/heimdall/internal/sequence"
 )
 
-type armResponse struct{ response *http.Response }
-
-func (r armResponse) decode(into any) error {
-	response := r.response
-	defer response.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(response.Body, 1048577))
-	if err != nil {
-		return err
-	}
-	if len(data) > 1048576 {
-		return (&AdapterError{Code: "HD0472", Message: "ARM response exceeds the 1MiB read limit"})
-	}
-	return json.Unmarshal(data, into)
+type armResponse struct {
+	response    *http.Response
+	data        []byte
+	destination any
 }
 
+func (r armResponse) decode(into any) error {
+	r.destination = into
+	defer r.response.Body.Close()
+	return (sequence.Steps{Actions: []func() error{r.read, r.limit, r.unmarshal}}).Run()
+}
+func (r *armResponse) read() error {
+	data, err := io.ReadAll(io.LimitReader(r.response.Body, (functionContract{}).responseBytes()+1))
+	r.data = data
+	return err
+}
+func (r *armResponse) limit() error {
+	if int64(len(r.data)) > (functionContract{}).responseBytes() {
+		return &AdapterError{Code: (functionContract{}).readCode(), Message: "ARM response exceeds the 1MiB read limit"}
+	}
+	return nil
+}
+func (r *armResponse) unmarshal() error { return json.Unmarshal(r.data, r.destination) }
 func (r armResponse) failure() error {
-	response := r.response
-	defer response.Body.Close()
-	return (&AdapterError{Code: "HD0473", Message: fmt.Sprintf("ARM returned HTTP %d; inspect provider request %q", response.StatusCode, response.Header.Get("x-ms-request-id"))})
+	defer r.response.Body.Close()
+	return &AdapterError{Code: (functionContract{}).responseCode(), Message: fmt.Sprintf("ARM returned HTTP %d; inspect provider request %q", r.response.StatusCode, r.response.Header.Get("x-ms-request-id"))}
 }
