@@ -1,0 +1,64 @@
+<div class="min-h-screen flex flex-col">
+  <site-header></site-header>
+  <main class="flex-1 max-w-[76rem] w-full mx-auto px-[clamp(1rem,4vw,2.5rem)] py-[clamp(1.5rem,4vw,3rem)] lg:flex lg:gap-10">
+    <docs-sidebar></docs-sidebar>
+    <article id="content" class="docs-article min-w-0 flex-1 max-w-[46rem] animate-[site-fade_0.3s_ease-out] max-lg:mt-6">
+      <h1>Sync, drift and rollback</h1>
+      <p class="lead">The loop that closes the gap — and the levers an operator has over it.</p>
+
+<h2>Sync policies</h2>
+<p>Auto-sync and self-heal are one loop, not two. On each tick the loop reads every consenting application's status; a moved revision syncs under <code>automated</code>, drift under the same revision heals under <code>self_heal</code>. Automated operations record a reason code instead of a principal, so the audit trail says "the policy did this".</p>
+<pre class="site-code">sync_policy:
+  automated: true
+  self_heal: true
+  prune: false</pre>
+<h2>Webhooks — a push is a nudge, not data</h2>
+<p>Point your forge at <code>POST /api/v1/webhooks/&lt;repo-id&gt;</code> with a shared secret (a reference, like every credential). The receiver verifies an HMAC over the raw body and never parses the payload — which branch moved is something the sync finds out by fetching. GitHub, GitLab, Gitea, and a plain <code>curl</code> from CI all work. Nudges are scoped to the pushed repository's applications and run in the loop's own goroutine, so a push storm coalesces instead of stampeding.</p>
+<h2>Plans, dry runs, selective syncs</h2>
+<p>A dry run produces the full plan and applies nothing. A sync can be narrowed to named services; pruning — deleting what the desired state no longer mentions — is always an explicit opt-in, marked in the plan.</p>
+<h2>Rollout strategy — compose's own vocabulary</h2>
+<p>How a service is replaced comes from <code>deploy.update_config</code>, not from a HEIMDALL extension. It is part of the revision's content hash, so changing a rollout strategy plans as an update.</p>
+<pre class="site-code">services:
+  api:
+    image: registry.example.com/api:1.4.2
+    deploy:
+      update_config:
+        order: start-first        # start-first | stop-first (default)
+        failure_action: rollback  # rollback | pause (default) | continue
+        monitor: 30s              # how long the replacement must stay healthy
+        parallelism: 1
+        delay: 5s</pre>
+<p>Swarm receives it as its own <code>UpdateConfig</code>. ECS receives it as a deployment configuration — <code>start-first</code> is 100%/200%, <code>stop-first</code> is 0%/100%, and <code>failure_action: rollback</code> enables the deployment circuit breaker, so AWS reverts a bad deployment on its own. Cloud Run and Container Apps always start the replacement first; <code>stop-first</code> is <em>partial</em> there and the matrix says so rather than pretending.</p>
+<p>A standalone Docker Engine gets true start-first for a service with no published ports: the replacement starts under a scratch name, holds healthy for <code>monitor</code>, and only then is the old container retired and the name handed over. A service that <em>does</em> publish a host port cannot have two copies on that port, so <code>start-first</code> is rejected at plan time (<code>HD0338</code>) naming the port and the three ways out — front it with a proxy, run <code>docker swarm init</code> on the box, or state <code>order: stop-first</code> and accept the gap.</p>
+<h2>A sync is not done until the runtime has converged</h2>
+<p>After applying, HEIMDALL polls live state until every touched service reports healthy at the new revision, held for <code>monitor</code>. Applied means converged, not submitted. A rollout that never settles ends the sync <em>Failed</em> with the reason (<code>HD0273</code>) instead of reporting success that resurfaces minutes later as drift — and under <code>failure_action: rollback</code> the previous revision is re-applied from the immutable revision store, by content.</p>
+<h2>Rollback</h2>
+<p>A rollback re-applies a stored revision by content, never by ref. It cannot be affected by anything that happened in git since — including a force-push. In-repo (sops) secret ciphertext is pinned by the same commit, so a rollback decrypts exactly what its revision was rendered from.</p>
+<h2>Scheduled and batch workloads</h2>
+<p>A nightly backup is desired state like anything else. It is declared with <code>x-heimdall-schedule</code> on the service, and the schedule is part of the revision's content hash, so editing a cron expression plans as an update.</p>
+<pre class="site-code">services:
+  nightly-report:
+    image: registry.example.com/reports:1.4.2
+    command: ["./report", "--daily"]
+    x-heimdall-schedule:
+      cron: "0 3 * * *"       # omit for a manual-only batch job
+      timezone: UTC           # defaults to UTC, never the host's zone
+      concurrency: forbid     # forbid | allow | replace
+      deadline: 15m           # a run that cannot start this soon is skipped
+      timeout: 30m            # a run still going then is killed and failed
+      retries: 2</pre>
+<p><strong>A scheduled service is not a running service.</strong> <code>ports</code>, <code>deploy.replicas</code>, <code>restart</code>, <code>healthcheck</code>, <code>depends_on</code>, and <code>deploy.update_config</code> are rejected at render time on a job (<code>HD0221</code>), because each contradicts having runs instead of a steady state — on every runtime, so the refusal lives in render rather than four times over in adapters.</p>
+<p><strong>HEIMDALL never owns the clock.</strong> A control plane that owned a cron would miss runs across a restart and double-fire across an active/passive failover, so the schedule is registered with the runtime's own scheduler: EventBridge Scheduler on ECS, Cloud Scheduler in front of a Cloud Run job, an ACA job's Schedule trigger on Container Apps, and the <code>heimdall agent</code> on Docker Engine and Swarm — which keeps firing while the control plane is unreachable. A Docker target with no agent enrolled refuses a scheduled service at plan time (<code>HD0340</code>) rather than running it once and never again. Container Apps evaluates job cron in UTC only, so a job naming another timezone is refused (<code>HD0383</code>) rather than quietly moved by an hour.</p>
+<p><strong>Running one now.</strong> <code>heimdall run --project P --app A --service S</code> starts a single out-of-band execution — a re-run after a failure, or the only way a manual-only batch job (a schedule with no <code>cron</code>) ever runs. It has its own authorization action, <code>app:run</code>: an operator who may re-run last night's report should not thereby be able to deploy. On a Docker target the request travels to the agent that owns the clock; nothing about desired state changes.</p>
+<p><strong>Deleting a job deletes its schedule first.</strong> An orphaned rule fires at 03:00 forever against a stale image, so every adapter removes the registration before the workload, and the conformance suite asserts it. Drift for a job is read from the registration, not from a container: a cron expression edited in a cloud console shows up as drift like any other change.</p>
+<p>An execution is an instance that stopped. A finished run carries its exit code and finish time, so per-instance logs and the revision link work for jobs without a second shape — and the instance page grows a <em>Runs</em> tab with a duration trend and one row per execution.</p>
+<h2>Offline targets park, then drain</h2>
+<p>A sync for a target whose agent is offline parks as a durable pending intent (bounded per target, 24-hour TTL). On reconnect the host runs <em>one</em> fresh sync that re-reads git — an hour of missed commits converges to the newest revision instead of marching through every intermediate one, and superseded intents close pointing at their replacement.</p>
+    </article>
+  </main>
+  <footer class="border-t border-[var(--w-border,#e3e3e3)]">
+    <div class="max-w-[76rem] mx-auto px-[clamp(1rem,4vw,2.5rem)] py-6 text-[0.85rem] site-muted">
+      HEIMDALL — GitOps for Docker Compose · v26.33.1
+    </div>
+  </footer>
+</div>

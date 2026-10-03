@@ -1,0 +1,35 @@
+# The shape the Phase 1 vertical slice deploys: two services, ordering,
+# a health gate, and a secret reference that must never be resolved at render.
+services:
+  api:
+    image: ghcr.io/example/checkout-api:1.4.2
+    command: ["/bin/api", "--listen", ":8000"]
+    environment:
+      DATABASE_URL: "${secret:vault/checkout#database_url}"
+      LOG_LEVEL: info
+    ports:
+      - "8000"
+    depends_on:
+      - db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/healthz"]
+      interval: 10s
+      timeout: 2s
+      retries: 3
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+  db:
+    image: postgres:16.4-alpine
+    environment:
+      POSTGRES_PASSWORD: "${secret:vault/checkout#postgres_password}"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 5

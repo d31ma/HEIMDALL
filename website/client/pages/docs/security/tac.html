@@ -1,0 +1,32 @@
+<div class="min-h-screen flex flex-col">
+  <site-header></site-header>
+  <main class="flex-1 max-w-[76rem] w-full mx-auto px-[clamp(1rem,4vw,2.5rem)] py-[clamp(1.5rem,4vw,3rem)] lg:flex lg:gap-10">
+    <docs-sidebar></docs-sidebar>
+    <article id="content" class="docs-article min-w-0 flex-1 max-w-[46rem] animate-[site-fade_0.3s_ease-out] max-lg:mt-6">
+      <h1>Security model</h1>
+      <p class="lead">The boundaries that hold even when something else fails.</p>
+
+<h2>SESAME decides, once</h2>
+<p>HEIMDALL contains no authentication or authorization logic — no password hashing, no session table, no role check in any handler, enforced by a CI gate. A dedicated security engine answers every question, exactly once per mutating route, at the boundary. Handlers receive already-authorized requests. An errored, timed-out, or unrecognised decision is a deny.</p>
+<h2>A closed verb vocabulary</h2>
+<p>Routes name actions from a closed set — <code>app:sync</code>, <code>registry:bind</code>, <code>observe:logs</code>, and so on — and ship in four role bundles (viewer, operator, admin, owner). Log access is deliberately separate from app access: container logs routinely contain what an operator who may deploy still should not read.</p>
+<h2>An audit log that cannot be rewritten</h2>
+<p>Every decision is recorded with the policy version that made it, so "why was this allowed in March" is answerable without replaying policy. The audit collection is authoritative, not a projection — a log you can regenerate is a log you can rewrite.</p>
+<h2>The web tier holds no authority</h2>
+<p>The browser talks to a thin proxy that attaches a session from an httpOnly cookie and forwards. No token in page-readable storage, no business logic, no authorization opinion — one door, with an allowlist that keeps it from becoming a request forge.</p>
+<h2>Everything else</h2>
+<ul>
+<li>Secrets are references; no value is ever persisted or logged.</li>
+<li>Agents enroll against a pinned certificate fingerprint and are not principals.</li>
+<li>Webhooks verify an HMAC and never parse the payload.</li>
+<li>Repositories can require signed commits before anything is rendered.</li>
+<li>The registry manifest cannot declare principals, grants, secret values, or agent enrollment.</li>
+</ul>
+    </article>
+  </main>
+  <footer class="border-t border-[var(--w-border,#e3e3e3)]">
+    <div class="max-w-[76rem] mx-auto px-[clamp(1rem,4vw,2.5rem)] py-6 text-[0.85rem] site-muted">
+      HEIMDALL — GitOps for Docker Compose · v26.33.1
+    </div>
+  </footer>
+</div>

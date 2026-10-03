@@ -1,0 +1,40 @@
+# The HEIMDALL website, declared for HEIMDALL to deploy — the product
+# shipping its own storefront. An ECS target consumes exactly this file:
+#
+#   # registry.yaml, in the root repository
+#   targets:
+#     - project: heimdall
+#       name: prod-ecs
+#       provider: ecs
+#       region: eu-west-1
+#       endpoint: arn:aws:ecs:eu-west-1:123456789012:cluster/prod
+#       credential_ref: aws-sm/eu-west-1/heimdall-deployer
+#   applications:
+#     - project: heimdall
+#       name: website
+#       repository: heimdall
+#       target: prod-ecs
+#       path: website/deploy
+#       sync_policy:
+#         automated: true
+#         self_heal: true
+#
+# Build and push the image first (CI's job):
+#   docker build -t $ECR/heimdall-website:26.33.1 -f website/Dockerfile website
+services:
+  website:
+    image: 123456789012.dkr.ecr.eu-west-1.amazonaws.com/heimdall-website:26.33.1
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+    restart: always
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 512M

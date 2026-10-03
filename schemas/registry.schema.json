@@ -1,0 +1,57 @@
+{
+ "projects?": [
+  {
+   "name": "^[a-z][a-z0-9_.-]{0,62}$",
+   "description?": "^.*$"
+  }
+ ],
+ "repositories?": [
+  {
+   "project": "^[a-z][a-z0-9_.-]{0,62}$",
+   "name": "^[a-z][a-z0-9_.-]{0,62}$",
+   "url": "^[^\\s]+$",
+   "default_ref?": "^[^\\s]+$",
+   "credential_ref?": "^[A-Za-z0-9:/#._-]+$",
+   "require_signature?": "^(true|false)$",
+   "webhook_secret_ref?": "^[A-Za-z0-9:/#._-]+$"
+  }
+ ],
+ "targets?": [
+  {
+   "project": "^[a-z][a-z0-9_.-]{0,62}$",
+   "name": "^[a-z][a-z0-9_.-]{0,62}$",
+   "provider": "^(docker|swarm|ecs|cloudrun|aca)$",
+   "region?": "^[^\\s]*$",
+   "endpoint?": "^[^\\s]*$",
+   "credential_ref?": "^[A-Za-z0-9:/#._-]+$",
+   "tags?": {
+    "^[A-Za-z_][A-Za-z0-9_.-]*$": "^.*$"
+   },
+   "config?": {
+    "^[A-Za-z_][A-Za-z0-9_.-]*$": "^.*$"
+   }
+  }
+ ],
+ "applications?": [
+  {
+   "project": "^[a-z][a-z0-9_.-]{0,62}$",
+   "name": "^[a-z][a-z0-9_.-]{0,62}$",
+   "repository": "^[a-z][a-z0-9_.-]{0,62}$",
+   "target": "^[a-z][a-z0-9_.-]{0,62}$",
+   "path": "^[^\\s]+$",
+   "ref?": "^[^\\s]+$",
+   "overlays?": [
+    "^[^\\s]+$"
+   ],
+   "variables?": {
+    "^[A-Za-z_][A-Za-z0-9_]*$": "^.*$"
+   },
+   "sync_policy?": {
+    "automated?": "^(true|false)$",
+    "self_heal?": "^(true|false)$",
+    "prune?": "^(true|false)$"
+   },
+   "suspended?": "^(true|false)$"
+  }
+ ]
+}

@@ -1,0 +1,154 @@
+<div class="min-h-screen flex flex-col">
+  <site-header></site-header>
+
+  <main id="content" class="flex-1">
+    <!-- Hero -->
+    <section class="max-w-[72rem] mx-auto px-[clamp(1rem,4vw,2.5rem)] pt-[clamp(3rem,8vw,6rem)] pb-[clamp(2rem,6vw,4rem)] grid grid-cols-[1.2fr_0.8fr] max-md:grid-cols-1 gap-10 items-center animate-[site-fade_0.4s_ease-out]">
+      <div>
+        <p class="site-muted uppercase tracking-[0.14em] text-[0.75rem] mb-3 mt-0">GitOps for Docker Compose</p>
+        <h1 class="text-[clamp(2rem,5vw,3.2rem)] leading-[1.1] mt-0 mb-4 font-bold">
+          The watchman for your <span class="text-[var(--w-primary,#b45309)]">compose</span> fleet.
+        </h1>
+        <p class="text-[1.1rem] leading-relaxed site-muted mt-0 mb-6 max-w-[38rem]">
+          Git as truth, continuous read-back of what actually runs, and the diff
+          between them closed automatically — for Docker Engine, Docker Swarm,
+          Amazon ECS, Google Cloud Run, and Azure Container Apps, from one
+          self-hosted control plane.
+        </p>
+        <div class="flex gap-3 flex-wrap items-center mb-6">
+          <a class="w-btn w-btn-filled w-btn-primary" href="/docs">Get started</a>
+          <a class="w-btn w-btn-outlined" href="#how">See how it works</a>
+        </div>
+        <pre class="site-code max-w-[34rem] m-0">heimdall init --admin ops
+heimdall serve</pre>
+      </div>
+      <div class="flex justify-center max-md:hidden">
+        <img src="/shared/assets/heimdall-mark.svg" class="w-[16rem] h-[16rem] drop-shadow-[0_0_60px_rgba(245,166,35,0.35)]" alt="Heimdallr's amber eye, the HEIMDALL mark">
+      </div>
+    </section>
+
+    <!-- Providers strip -->
+    <section class="border-y border-[var(--w-border,#e3e3e3)] bg-[color-mix(in_srgb,var(--w-primary,#b45309)_4%,var(--w-surface,#fff))]">
+      <div class="max-w-[72rem] mx-auto px-[clamp(1rem,4vw,2.5rem)] py-5 flex items-center justify-between max-md:justify-center gap-4 flex-wrap">
+        <span class="site-muted text-[0.85rem] uppercase tracking-[0.1em]">Five runtimes, one model</span>
+        <div class="flex gap-2.5 flex-wrap justify-center">
+          <span class="w-chip w-chip-filled w-chip-primary">Docker Engine</span>
+          <span class="w-chip w-chip-filled w-chip-primary">Docker Swarm</span>
+          <span class="w-chip w-chip-filled w-chip-primary">Amazon ECS</span>
+          <span class="w-chip w-chip-filled w-chip-primary">Google Cloud Run</span>
+          <span class="w-chip w-chip-filled w-chip-primary">Azure Container Apps</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- How it works -->
+    <section id="how" class="max-w-[72rem] mx-auto px-[clamp(1rem,4vw,2.5rem)] py-[clamp(3rem,7vw,5rem)]">
+      <h2 class="text-[clamp(1.5rem,3vw,2rem)] mt-0 mb-2 font-bold">One loop, four mechanics</h2>
+      <p class="site-muted mt-0 mb-8 max-w-[44rem]">
+        ArgoCD's mechanics, applied to compose: your repository declares the
+        desired state, the control plane keeps reading the live state back, and
+        anything that makes the two disagree becomes a plan.
+      </p>
+      <div class="grid grid-cols-4 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4">
+        <div class="border border-[var(--w-border,#ddd)] rounded-lg p-5 bg-[var(--w-surface,#fff)] transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 motion-reduce:transition-none">
+          <div class="text-[var(--w-primary,#b45309)] font-bold text-[0.8rem] uppercase tracking-wide mb-2">1 — Declare</div>
+          <p class="m-0 text-[0.95rem] leading-relaxed">Compose files and overlays in git render into one canonical, content-hashed <code>DeploySpec</code>. Reformatting is not a change; a force-push cannot rewrite history you already deployed.</p>
+        </div>
+        <div class="border border-[var(--w-border,#ddd)] rounded-lg p-5 bg-[var(--w-surface,#fff)] transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 motion-reduce:transition-none">
+          <div class="text-[var(--w-primary,#b45309)] font-bold text-[0.8rem] uppercase tracking-wide mb-2">2 — Plan</div>
+          <p class="m-0 text-[0.95rem] leading-relaxed">Every sync shows its work first: create, update, delete, per service, with the reason. A compose directive a runtime cannot honour is rejected by name at plan time — never silently dropped.</p>
+        </div>
+        <div class="border border-[var(--w-border,#ddd)] rounded-lg p-5 bg-[var(--w-surface,#fff)] transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 motion-reduce:transition-none">
+          <div class="text-[var(--w-primary,#b45309)] font-bold text-[0.8rem] uppercase tracking-wide mb-2">3 — Apply</div>
+          <p class="m-0 text-[0.95rem] leading-relaxed">Waves ordered by <code>depends_on</code>, secrets resolved at the last moment and never persisted, registry credentials used inside one call. One operation document records the whole story.</p>
+        </div>
+        <div class="border border-[var(--w-border,#ddd)] rounded-lg p-5 bg-[var(--w-surface,#fff)] transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 motion-reduce:transition-none">
+          <div class="text-[var(--w-primary,#b45309)] font-bold text-[0.8rem] uppercase tracking-wide mb-2">4 — Observe</div>
+          <p class="m-0 text-[0.95rem] leading-relaxed">Continuous live-state read-back. A new commit and a container killed by hand are the same observation — drift — and auto-sync and self-heal are the same loop answering it.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section id="features" class="border-t border-[var(--w-border,#e3e3e3)] bg-[color-mix(in_srgb,var(--w-primary,#b45309)_3%,var(--w-surface,#fff))]">
+      <div class="max-w-[72rem] mx-auto px-[clamp(1rem,4vw,2.5rem)] py-[clamp(3rem,7vw,5rem)]">
+        <h2 class="text-[clamp(1.5rem,3vw,2rem)] mt-0 mb-8 font-bold">Built like it has to answer for itself</h2>
+        <div class="grid grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4">
+          <div class="border border-[var(--w-border,#ddd)] rounded-lg p-5 bg-[var(--w-surface,#fff)] transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 motion-reduce:transition-none">
+            <h3 class="mt-0 mb-2 text-[1.05rem]">An honest capability matrix</h3>
+            <p class="m-0 text-[0.92rem] leading-relaxed site-muted">Each adapter answers what it can and cannot express, and the published matrix is generated from those answers. Replicas on a standalone Engine? Rejected, with the alternative named.</p>
+          </div>
+          <div class="border border-[var(--w-border,#ddd)] rounded-lg p-5 bg-[var(--w-surface,#fff)] transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 motion-reduce:transition-none">
+            <h3 class="mt-0 mb-2 text-[1.05rem]">Rollback that means it</h3>
+            <p class="m-0 text-[0.92rem] leading-relaxed site-muted">A rollback re-applies a stored, immutable revision. It never re-reads git, so a force-push cannot change what rolling back means.</p>
+          </div>
+          <div class="border border-[var(--w-border,#ddd)] rounded-lg p-5 bg-[var(--w-surface,#fff)] transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 motion-reduce:transition-none">
+            <h3 class="mt-0 mb-2 text-[1.05rem]">Agents for hosts you cannot dial</h3>
+            <p class="m-0 text-[0.92rem] leading-relaxed site-muted">Outbound-only agents over mTLS with fingerprint-pinned enrollment. An agent is not a principal: it holds no grant and receives only the work an authorized sync produced.</p>
+          </div>
+          <div class="border border-[var(--w-border,#ddd)] rounded-lg p-5 bg-[var(--w-surface,#fff)] transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 motion-reduce:transition-none">
+            <h3 class="mt-0 mb-2 text-[1.05rem]">Secrets are references</h3>
+            <p class="m-0 text-[0.92rem] leading-relaxed site-muted">SOPS-encrypted files in your own repo, AWS Secrets Manager, Azure Key Vault, GCP, or a local sealed store. Values resolve at apply time, inside one call, and are never persisted or logged.</p>
+          </div>
+          <div class="border border-[var(--w-border,#ddd)] rounded-lg p-5 bg-[var(--w-surface,#fff)] transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 motion-reduce:transition-none">
+            <h3 class="mt-0 mb-2 text-[1.05rem]">Dashboards, not a database</h3>
+            <p class="m-0 text-[0.92rem] leading-relaxed site-muted">A resource tree, per-instance Grafana-style dashboards with deploy markers, and tailing logs — from provider-native metrics and bounded rollups. Deliberately not another time-series database.</p>
+          </div>
+          <div class="border border-[var(--w-border,#ddd)] rounded-lg p-5 bg-[var(--w-surface,#fff)] transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 motion-reduce:transition-none">
+            <h3 class="mt-0 mb-2 text-[1.05rem]">The registry lives in git too</h3>
+            <p class="m-0 text-[0.92rem] leading-relaxed site-muted">Bind one root repository and declare projects, repositories, targets, and applications in a reviewed manifest. One interactive act; every change after it is a commit.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Security -->
+    <section id="security" class="max-w-[72rem] mx-auto px-[clamp(1rem,4vw,2.5rem)] py-[clamp(3rem,7vw,5rem)]">
+      <div class="grid grid-cols-[1fr_1fr] max-md:grid-cols-1 gap-10 items-start">
+        <div>
+          <h2 class="text-[clamp(1.5rem,3vw,2rem)] mt-0 mb-3 font-bold">Authorization is someone else's whole job</h2>
+          <p class="site-muted leading-relaxed mt-0 mb-4 max-w-[36rem]">
+            HEIMDALL writes no authentication or authorization logic — no password
+            hashing, no session table, no role checks in handlers. SESAME, a
+            dedicated security engine, decides every question exactly once, at the
+            boundary, and an errored or unrecognised decision is a deny.
+          </p>
+          <ul class="m-0 pl-5 leading-loose text-[0.95rem]">
+            <li>One <code>Decide</code> per mutating route; handlers receive already-authorized requests</li>
+            <li>An authoritative audit log — not a projection anyone could rebuild, and so rewrite</li>
+            <li>Sessions live in httpOnly cookies; the web tier holds no authority and makes no decisions</li>
+            <li>Webhooks verify an HMAC and never parse the payload — a push is a nudge, not data</li>
+          </ul>
+        </div>
+        <div>
+          <pre class="site-code m-0"># the registry, declared
+projects:
+  - name: shop
+repositories:
+  - project: shop
+    name: site
+    url: ssh://git@forge/shop/site.git
+applications:
+  - project: shop
+    name: site
+    repository: site
+    target: local
+    path: deploy
+    sync_policy:
+      automated: true
+      self_heal: true</pre>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="border-t border-[var(--w-border,#e3e3e3)]">
+    <div class="max-w-[72rem] mx-auto px-[clamp(1rem,4vw,2.5rem)] py-6 flex items-center justify-between gap-4 flex-wrap text-[0.85rem] site-muted">
+      <span class="flex items-center gap-2">
+        <img src="/shared/assets/heimdall-mark.svg" class="w-5 h-5" alt="" aria-hidden="true">
+        HEIMDALL — GitOps for Docker Compose
+      </span>
+      <span>v26.33.1 · self-hosted · Apache-2.0</span>
+    </div>
+  </footer>
+</div>

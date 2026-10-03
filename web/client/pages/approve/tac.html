@@ -1,0 +1,76 @@
+<a class="skip" href="#hd-main">Skip to content</a>
+<div class="hd-shell min-h-screen flex flex-col">
+  <header class="hd-bar backdrop-blur-md flex items-center justify-between gap-4 py-4 px-[clamp(1rem,4vw,2rem)] sticky top-0 z-10 border-b border-[var(--w-border,#e3e3e3)] bg-[color-mix(in_srgb,var(--w-surface,#fff)_82%,transparent)]">
+    <div class="hd-brand flex items-center gap-2.5 flex-wrap">
+      <a class="hd-link flex items-center gap-2.5" href="/"><img src="/shared/assets/heimdall-mark.svg" class="w-7 h-7" alt="" aria-hidden="true"> <strong>HEIMDALL</strong></a>
+      <span class="hd-tagline text-[0.9rem] text-[var(--w-text-muted,#666)] max-sm:hidden">Approve a device</span>
+    </div>
+    <div id="hd-identity" class="hd-identity"></div>
+  </header>
+
+  <!-- Three states, one template. The companion holds which one is showing
+       and the values in it; nothing here is built from a string in
+       JavaScript, so the markup an operator sees is the markup in this
+       file. -->
+  <main id="hd-main" class="hd-main max-w-[76rem] animate-[hd-fade_0.25s_ease-out] w-full mx-auto p-[clamp(1rem,4vw,2rem)] flex-1" :aria-busy="busy">
+    <if :when="loading">
+      <p class="hd-muted">Loading…</p>
+    </if>
+    <else>
+      <section class="hd-centre flex justify-center pt-12">
+        <div class="w-card hd-login p-[1.6rem] w-[min(26rem,100%)] flex flex-col gap-[0.8rem]">
+
+          <if :when="onForm">
+            <h1 class="hd-h1 text-[clamp(1.4rem,3vw,1.9rem)] mt-0 mb-[0.4rem]">Approve a device</h1>
+            <p class="hd-muted">
+              A terminal running <code>heimdall login --device</code> showed a short code.
+              Enter it here only if that terminal is yours and in front of you.
+            </p>
+            <div id="hd-approve-error" role="alert">
+              <if :when="pageError">
+                <div class="w-alert w-alert--color-error">{pageError}</div>
+              </if>
+            </div>
+            <form id="hd-lookup" on:submit="lookUp($event)">
+              <label class="hd-field flex flex-col gap-1 text-[0.9rem]">
+                <span>Device code</span>
+                <input id="hd-code" class="py-[0.55rem] px-[0.7rem] rounded-md border border-[var(--w-border,#999)] bg-[var(--w-surface,#fff)] text-base focus-visible:outline-2 focus-visible:outline-[var(--w-primary,#3b5bdb)] focus-visible:outline-offset-2"
+                       autocomplete="off" autofocus placeholder="ABCD-EFGH" spellcheck="false"
+                       :value="code" on:input="typeCode($event)">
+              </label>
+              <button class="w-btn w-btn-filled w-btn-primary" type="submit" :disabled="busy">Look up</button>
+            </form>
+          </if>
+
+          <if :when="onConfirm">
+            <h1 class="hd-h1 text-[clamp(1.4rem,3vw,1.9rem)] mt-0 mb-[0.4rem]">Approve this device?</h1>
+            <dl class="hd-facts flex gap-6 max-sm:gap-4 flex-wrap m-0">
+              <div><dt>Code</dt><dd><code>{code}</code></dd></div>
+              <div><dt>Client</dt><dd>{clientName}</dd></div>
+            </dl>
+            <p class="hd-muted">
+              Approving signs that terminal in as <strong>you</strong>. If you did not just run
+              <code>heimdall login --device</code>, deny it — someone may be phishing this code.
+            </p>
+            <div id="hd-approve-error" role="alert">
+              <if :when="pageError">
+                <div class="w-alert w-alert--color-error">{pageError}</div>
+              </if>
+            </div>
+            <div class="hd-actions flex gap-2 flex-wrap">
+              <button id="hd-deny" class="w-btn w-btn-outlined" type="button" :disabled="busy" on:click="deny()">Deny</button>
+              <button id="hd-approve" class="w-btn w-btn-filled w-btn-primary" type="button" :disabled="busy" on:click="approve()">Approve</button>
+            </div>
+          </if>
+
+          <if :when="onDone">
+            <h1 class="hd-h1 text-[clamp(1.4rem,3vw,1.9rem)] mt-0 mb-[0.4rem]">Done</h1>
+            <p>{outcome}</p>
+            <a class="hd-link" href="/">Back to applications</a>
+          </if>
+
+        </div>
+      </section>
+    </else>
+  </main>
+</div>

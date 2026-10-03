@@ -1,0 +1,194 @@
+<a class="skip" href="#hd-main">Skip to content</a>
+<div class="hd-shell min-h-screen flex flex-col">
+  <header class="hd-bar backdrop-blur-md flex items-center justify-between gap-4 py-4 px-[clamp(1rem,4vw,2rem)] sticky top-0 z-10 border-b border-[var(--w-border,#e3e3e3)] bg-[color-mix(in_srgb,var(--w-surface,#fff)_82%,transparent)]">
+    <div class="hd-brand flex items-center gap-2.5 flex-wrap">
+      <a class="hd-link flex items-center gap-2.5" href="/"><img src="/shared/assets/heimdall-mark.svg" class="w-7 h-7" alt="" aria-hidden="true"> <strong>HEIMDALL</strong></a>
+      <span id="hd-breadcrumb" class="hd-tagline text-[0.9rem] text-[var(--w-text-muted,#666)] max-sm:hidden"><a class="hd-link" :href="appHref">{project} / {app}</a> / {shortID}</span>
+    </div>
+    <div id="hd-identity" class="hd-identity">
+      <button class="w-btn w-btn-text w-btn--sm" type="button" on:click="signOut()">Sign out</button>
+    </div>
+  </header>
+
+  <!-- The instance detail page, in the shape an operator already knows from
+       Docker Desktop: identity and status up top, then tabs. What it
+       deliberately does not carry is the other half of that screen — no
+       exec, no file browser, no start/stop/delete. HEIMDALL shows what git
+       declared and what the runtime has; changing a container by hand is
+       the anti-GitOps escape hatch this product refuses to build. -->
+  <main id="hd-main" class="hd-main max-w-[88rem] animate-[hd-fade_0.25s_ease-out] w-full mx-auto p-[clamp(1rem,4vw,2rem)] flex-1" :aria-busy="busy">
+    <if :when="pageError">
+      <div class="w-alert w-alert--color-error" role="alert">{pageError}</div>
+    </if>
+
+    <if :when="loading">
+      <p class="hd-muted">Loading…</p>
+    </if>
+    <else>
+      <div class="hd-detail-head flex items-start justify-between gap-6 flex-wrap mb-5">
+        <div class="min-w-0">
+          <h1 class="hd-h1 text-[clamp(1.4rem,3vw,2rem)] mt-0 mb-2 [overflow-wrap:anywhere]">{serviceName}</h1>
+          <div class="flex items-center gap-x-4 gap-y-2 flex-wrap text-[0.85rem] text-[var(--w-text-muted,#666)]">
+            <span class="font-mono">{shortID}</span>
+            <button class="w-btn w-btn-text w-btn--sm rounded-full" type="button" on:click="copyID()">{copyLabel}</button>
+            <span aria-hidden="true">·</span>
+            <span class="font-mono [overflow-wrap:anywhere]">{image}</span>
+            <span aria-hidden="true">·</span>
+            <a class="hd-link" :href="appHref">{project} / {app}</a>
+          </div>
+        </div>
+
+        <div class="flex items-start gap-5 flex-wrap">
+          <div>
+            <div class="text-[0.7rem] uppercase tracking-[0.05em] text-[var(--w-text-muted,#666)] mb-1">Status</div>
+            <div :class="statusClass">{statusText}</div>
+          </div>
+          <if :when="scheduled">
+            <div>
+              <div class="text-[0.7rem] uppercase tracking-[0.05em] text-[var(--w-text-muted,#666)] mb-1">Schedule</div>
+              <div class="font-mono text-[0.9rem]">{schedule}</div>
+              <div class="text-[0.78rem] text-[var(--w-text-muted,#666)]">next {nextRun}</div>
+            </div>
+            <button class="w-btn w-btn-primary rounded-full" type="button" :disabled="running" on:click="runNow()">{runLabel}</button>
+          </if>
+        </div>
+      </div>
+
+      <if :when="gone">
+        <div class="w-alert w-alert--color-warning" role="alert">This instance is not running right now; showing its recorded history.</div>
+      </if>
+
+      <nav class="hd-tabs flex items-center gap-1 border-b border-[var(--w-border,#e3e3e3)] mb-4 overflow-x-auto" aria-label="Instance views">
+        <loop :for="entry of tabs">
+          <button type="button" :class="entry.className" :aria-current="entry.current" :data-tab="entry.id" on:click="selectTab(event)">{entry.label}</button>
+        </loop>
+      </nav>
+
+      <if :when="onMetrics">
+        <!-- The window chooser. It sits above the tiles because it governs
+             everything below it, charts and tiles alike. -->
+        <div class="flex items-center justify-end gap-1 mb-3" role="group" aria-label="Metrics window">
+          <loop :for="entry of windows">
+            <button type="button" :class="entry.className" :data-window="entry.value"
+                    :aria-pressed="entry.current" on:click="selectWindow($event)">{entry.label}</button>
+          </loop>
+        </div>
+
+        <div class="hd-tiles grid grid-cols-[repeat(auto-fit,minmax(min(10rem,100%),1fr))] gap-[0.8rem] mb-4">
+          <loop :for="tile of tiles">
+            <div class="hd-tile transition-all duration-200 ease-out hover:shadow-md hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:hover:shadow-none border border-[var(--w-border,#ddd)] rounded-lg py-[0.7rem] px-[0.9rem] bg-[var(--w-surface,#fff)] [overflow-wrap:anywhere]">
+              <div class="hd-tile-label text-[0.7rem] uppercase tracking-[0.05em] text-[var(--w-text-muted,#666)] mb-1">{tile.label}</div>
+              <div :class="tile.valueClass">{tile.value}</div>
+            </div>
+          </loop>
+        </div>
+
+        <div class="hd-panels grid grid-cols-[repeat(auto-fit,minmax(min(24rem,100%),1fr))] gap-[0.9rem]">
+          <loop :for="panel of panels">
+            <section class="hd-panel transition-all duration-200 ease-out hover:shadow-md hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:hover:shadow-none animate-[hd-fade_0.3s_ease-out] border border-[var(--w-border,#ddd)] rounded-lg py-[0.8rem] px-4 bg-[var(--w-surface,#fff)]">
+              <h2 class="hd-panel-title text-[0.85rem] mt-0 mb-2 text-[var(--w-text-muted,#555)]">{panel.title}</h2>
+              <hd-timeseries :id="panel.id"></hd-timeseries>
+            </section>
+          </loop>
+        </div>
+      </if>
+
+      <if :when="onLogs">
+        <!-- The console is dark in both themes, like every terminal: the
+             text is a container's stdout, and a surface that flips with the
+             theme is how the light-mode contrast bug happened. -->
+        <section class="hd-console relative rounded-lg overflow-hidden border border-[#2a2f3a] bg-[#11151c]">
+          <div class="flex items-center gap-2 px-3 py-2 border-b border-[#2a2f3a] bg-[#171c25]">
+            <label class="sr-only" for="hd-log-filter">Filter log lines</label>
+            <input id="hd-log-filter" class="w-input w-input--sm flex-1 min-w-0 rounded-full bg-[#0d1117] text-[#e6edf3] border border-[#2a2f3a] px-3 py-1 text-[0.82rem]"
+                   type="search" placeholder="Filter lines…" :value="logFilter" on:input="filterLogs(event)">
+            <button class="w-btn w-btn-text w-btn--sm rounded-full text-[#e6edf3]" type="button" on:click="copyLogs()">{copyLogsLabel}</button>
+            <button class="w-btn w-btn-text w-btn--sm rounded-full text-[#e6edf3]" type="button" on:click="jumpToLatest()">Jump to latest</button>
+          </div>
+          <pre id="hd-logs" class="hd-logs scroll-smooth min-h-[24rem] max-h-[32rem] overflow-auto m-0 py-[0.7rem] px-[0.9rem] text-[0.78rem] leading-[1.5] whitespace-pre-wrap [overflow-wrap:anywhere] bg-[#11151c] text-[#e6edf3]" aria-live="polite" tabindex="0">Loading…</pre>
+        </section>
+      </if>
+
+      <if :when="onRuns">
+        <if :when="runs.length">
+          <section class="border border-[var(--w-border,#ddd)] rounded-lg py-[0.8rem] px-4 bg-[var(--w-surface,#fff)] mb-4">
+            <h2 class="text-[0.85rem] mt-0 mb-2 text-[var(--w-text-muted,#555)]">Run duration</h2>
+            <w-sparkline :values="durations" class="block w-full h-16"></w-sparkline>
+          </section>
+          <table class="hd-table w-full border-collapse text-[0.9rem]">
+            <thead>
+              <tr class="text-left text-[0.72rem] uppercase tracking-[0.05em] text-[var(--w-text-muted,#666)]">
+                <th scope="col" class="py-2 pr-4">Started</th>
+                <th scope="col" class="py-2 pr-4">Duration</th>
+                <th scope="col" class="py-2 pr-4">Outcome</th>
+                <th scope="col" class="py-2 pr-4">Revision</th>
+              </tr>
+            </thead>
+            <tbody>
+              <loop :for="run of runs">
+                <tr class="border-t border-[var(--w-border,#e3e3e3)]">
+                  <td class="py-2 pr-4 font-mono text-[0.82rem]">{run.started}</td>
+                  <td class="py-2 pr-4">{run.duration}</td>
+                  <td class="py-2 pr-4"><span :class="run.outcomeClass">{run.outcome}</span></td>
+                  <td class="py-2 pr-4 font-mono text-[0.82rem]">{run.revision}</td>
+                </tr>
+              </loop>
+            </tbody>
+          </table>
+
+          <if :when="showRunsPager">
+            <div class="flex items-center justify-between gap-4 flex-wrap mt-[0.4rem]">
+              <p class="hd-muted text-[0.85rem] m-0">{runsRange}</p>
+              <nav class="w-pagination" aria-label="run pages">
+                <button class="w-page-item" type="button" :disabled="onFirstRun"
+                        aria-label="previous page" on:click="stepRuns(-1)">←</button>
+                <loop :for="page of runsPages">
+                  <if :when="page.ellipsis">
+                    <span class="w-page-ellipsis" aria-hidden="true">…</span>
+                  </if>
+                  <else>
+                    <button :class="page.className" type="button" :data-page="page.value"
+                            :aria-current="page.current" :aria-label="page.ariaLabel"
+                            on:click="goToRunsPage($event)">{page.label}</button>
+                  </else>
+                </loop>
+                <button class="w-page-item" type="button" :disabled="onLastRun"
+                        aria-label="next page" on:click="stepRuns(1)">→</button>
+              </nav>
+            </div>
+          </if>
+        </if>
+        <else>
+          <p class="hd-muted">No runs recorded yet. A scheduled job's executions appear here as they finish.</p>
+        </else>
+      </if>
+
+      <if :when="onInspect">
+        <!-- Read-only by construction: what the runtime reports and what git
+             declared, never an editor. -->
+        <dl class="grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-6 gap-y-2 text-[0.9rem]">
+          <loop :for="row of inspectRows">
+            <dt class="text-[var(--w-text-muted,#666)]">{row.label}</dt>
+            <dd class="m-0 font-mono text-[0.85rem] [overflow-wrap:anywhere]">{row.value}</dd>
+          </loop>
+        </dl>
+      </if>
+
+      <if :when="onEvents">
+        <if :when="events.length">
+          <ul class="list-none p-0 m-0">
+            <loop :for="entry of events">
+              <li class="border-t border-[var(--w-border,#e3e3e3)] py-2 flex gap-4 flex-wrap">
+                <span class="font-mono text-[0.8rem] text-[var(--w-text-muted,#666)]">{entry.at}</span>
+                <span class="[overflow-wrap:anywhere]">{entry.message}</span>
+              </li>
+            </loop>
+          </ul>
+        </if>
+        <else>
+          <p class="hd-muted">The runtime has reported no recent events for this application.</p>
+        </else>
+      </if>
+    </else>
+  </main>
+</div>

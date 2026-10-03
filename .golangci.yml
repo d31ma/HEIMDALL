@@ -1,0 +1,30 @@
+# Lint configuration. The default linter set plus the ones that catch the
+# mistakes this codebase can actually make: unchecked errors on a security
+# path, unhandled shadowing in a fail-closed branch, and unused code that
+# looks like it is doing something.
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - bodyclose
+    - errorlint
+    - misspell
+    - nilerr
+    - unconvert
+
+  exclusions:
+    rules:
+      # Vendored client shims carry their upstream's style, and reformatting
+      # them would make the refresh in scripts/vendor-clients.sh a merge.
+      - path: 'internal/(store/fylo|schema/chex)/'
+        linters:
+          - errcheck
+          - staticcheck
+          - unused
+          - errorlint
+          - unconvert

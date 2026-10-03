@@ -1,0 +1,33 @@
+<div class="min-h-screen flex flex-col">
+  <site-header></site-header>
+  <main class="flex-1 max-w-[76rem] w-full mx-auto px-[clamp(1rem,4vw,2.5rem)] py-[clamp(1.5rem,4vw,3rem)] lg:flex lg:gap-10">
+    <docs-sidebar></docs-sidebar>
+    <article id="content" class="docs-article min-w-0 flex-1 max-w-[46rem] animate-[site-fade_0.3s_ease-out] max-lg:mt-6">
+      <h1>Core concepts</h1>
+      <p class="lead">Five nouns explain the whole system: spec, revision, plan, operation, and drift.</p>
+
+<h2>DeploySpec — the canonical model</h2>
+<p>Compose files plus overlays plus secret references render into one provider-neutral type, the <code>DeploySpec</code>. It is validated on the way out, canonicalized to exactly one byte sequence, and content-addressed with SHA-256. Two properties are load-bearing: the same commit renders byte-identically on any machine, and there are no maps anywhere in the type — every collection is a sorted slice, so the hash cannot depend on iteration order. Reformatting a compose file produces the same revision.</p>
+<h2>Revision — the unit of history</h2>
+<p>A revision is one commit rendered to a spec, stored immutably. It is the audit spine and the rollback unit: rolling back re-applies a stored revision and never re-reads git, so a force-push cannot change what rolling back means.</p>
+<h2>Plan — the work, shown first</h2>
+<p>A plan compares the desired spec against what the runtime actually has and lists the operations that would close the gap — <code>create</code>, <code>update</code>, <code>restart</code>, <code>delete</code>, or <code>noop</code>, per service, each with a reason. A plan of pure noops is how <em>Synced</em> is decided. A compose directive the target runtime cannot honour fails the plan by name; nothing is ever silently dropped.</p>
+<h2>Operation — one record per sync</h2>
+<p>Every sync is one document that every phase writes into: pending, planning, applying, then succeeded, failed, or superseded. A crash leaves one record in a known state rather than four collections disagreeing. Live state, events, and rollups are projections folded from operations and can always be rebuilt; the audit log is deliberately <em>not</em> a projection — a log you can regenerate is a log you can rewrite.</p>
+<h2>Drift — one observation, two consents</h2>
+<p>The loop continuously reads live state back. A new commit and a container killed by hand are the same observation — the desired and live states disagree. The application's sync policy decides what happens next: <code>automated</code> consents to converging on a moved revision, <code>self_heal</code> consents to restoring the same revision when the runtime drifted underneath it.</p>
+<h2>Waves</h2>
+<p>Services deploy in waves ordered by <code>depends_on</code>, and a service can be pushed to a later wave explicitly with a label — useful for migrations that must land before the app:</p>
+<pre class="site-code">services:
+  migrate:
+    image: ghcr.io/example/migrate:3
+    labels:
+      heimdall.wave: "1" </pre>
+    </article>
+  </main>
+  <footer class="border-t border-[var(--w-border,#e3e3e3)]">
+    <div class="max-w-[76rem] mx-auto px-[clamp(1rem,4vw,2.5rem)] py-6 text-[0.85rem] site-muted">
+      HEIMDALL — GitOps for Docker Compose · v26.33.1
+    </div>
+  </footer>
+</div>

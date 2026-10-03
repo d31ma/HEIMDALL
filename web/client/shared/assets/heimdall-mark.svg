@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="HEIMDALL">
+  <!-- The mark: Heimdallr's amber iris, the one that sees a hundred leagues
+       by day or night. Just the iris and pupil in their own glow — the lids
+       are gone, because this eye does not blink. Fixed colours by design:
+       a mark keeps its identity across light and dark themes. -->
+  <defs>
+    <radialGradient id="hd-iris" cx="46%" cy="42%" r="60%">
+      <stop offset="0%" stop-color="#ffedb0"/>
+      <stop offset="30%" stop-color="#ffd166"/>
+      <stop offset="62%" stop-color="#f59f00"/>
+      <stop offset="88%" stop-color="#c76a06"/>
+      <stop offset="100%" stop-color="#7d4205"/>
+    </radialGradient>
+    <radialGradient id="hd-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="55%" stop-color="#ffb703" stop-opacity="0"/>
+      <stop offset="78%" stop-color="#ffb703" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#ffb703" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- The glow the bridge-keeper's eyes give off -->
+  <circle cx="32" cy="32" r="31" fill="url(#hd-glow)"/>
+
+  <!-- Iris -->
+  <circle cx="32" cy="32" r="20" fill="url(#hd-iris)"/>
+  <!-- Iris fibres, the radial grain of a real eye -->
+  <g stroke="#a85e06" stroke-width="1.1" opacity="0.55">
+    <line x1="32" y1="13.5" x2="32" y2="21.5"/>
+    <line x1="32" y1="50.5" x2="32" y2="42.5"/>
+    <line x1="13.5" y1="32" x2="21.5" y2="32"/>
+    <line x1="50.5" y1="32" x2="42.5" y2="32"/>
+    <line x1="18.9" y1="18.9" x2="24.6" y2="24.6"/>
+    <line x1="45.1" y1="45.1" x2="39.4" y2="39.4"/>
+    <line x1="45.1" y1="18.9" x2="39.4" y2="24.6"/>
+    <line x1="18.9" y1="45.1" x2="24.6" y2="39.4"/>
+    <line x1="24.9" y1="14.9" x2="27.9" y2="22.3"/>
+    <line x1="39.1" y1="49.1" x2="36.1" y2="41.7"/>
+    <line x1="49.1" y1="24.9" x2="41.7" y2="27.9"/>
+    <line x1="14.9" y1="39.1" x2="22.3" y2="36.1"/>
+    <line x1="39.1" y1="14.9" x2="36.1" y2="22.3"/>
+    <line x1="24.9" y1="49.1" x2="27.9" y2="41.7"/>
+    <line x1="14.9" y1="24.9" x2="22.3" y2="27.9"/>
+    <line x1="49.1" y1="39.1" x2="41.7" y2="36.1"/>
+  </g>
+  <g stroke="#ffe8a3" stroke-width="1" opacity="0.6">
+    <line x1="28.4" y1="15.8" x2="30" y2="22.1"/>
+    <line x1="35.6" y1="48.2" x2="34" y2="41.9"/>
+    <line x1="48.2" y1="28.4" x2="41.9" y2="30"/>
+    <line x1="15.8" y1="35.6" x2="22.1" y2="34"/>
+  </g>
+  <!-- Limbal ring -->
+  <circle cx="32" cy="32" r="19.8" fill="none" stroke="#6b3a05" stroke-width="2.2"/>
+  <!-- Pupil, with the soft edge a real pupil has -->
+  <circle cx="32" cy="32" r="8" fill="#2b1a05" opacity="0.55"/>
+  <circle cx="32" cy="32" r="6.8" fill="#160d04"/>
+  <!-- What the eye reflects is what it monitors. The main glint is a tiny
+       dashboard: a screen with a metrics sparkline caught in the cornea. -->
+  <g transform="rotate(-12 37.4 27.4)">
+    <rect x="33.6" y="24.4" width="7.6" height="6" rx="1.2" fill="#ffffff" opacity="0.45"/>
+    <polyline points="34.8,28.6 36.2,27.2 37.4,28 39,25.6 40.2,26.6"
+      fill="none" stroke="#e8590c" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
+  </g>
+  <!-- Log lines shimmering across the lower iris, a tail being followed -->
+  <g stroke="#ffffff" stroke-width="0.9" stroke-linecap="round" opacity="0.22" transform="rotate(6 32 32)">
+    <line x1="25" y1="40.2" x2="31.5" y2="40.2"/>
+    <line x1="25" y1="42.4" x2="29.2" y2="42.4"/>
+    <line x1="25" y1="44.6" x2="30.4" y2="44.6"/>
+  </g>
+  <!-- And in the pupil, where reflection is strongest, the live series -->
+  <polyline points="27.6,34.6 29.4,33 30.8,34 32.6,31.2 34.4,32.4 36,30.2"
+    fill="none" stroke="#69db7c" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round" opacity="0.35"/>
+  <circle cx="36" cy="30.2" r="0.7" fill="#69db7c" opacity="0.5"/>
+  <!-- The echo glint -->
+  <circle cx="27.4" cy="28" r="1.4" fill="#ffffff" opacity="0.35"/>
+</svg>

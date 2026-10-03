@@ -1,0 +1,6 @@
+{
+  "apiUrl": "https://127.0.0.1:8443",
+  "caFile": "/home/heimdall/.heimdall/keys/agent-ca.crt",
+  "secureCookie": true,
+  "timeoutMs": 60000
+}

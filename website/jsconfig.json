@@ -1,0 +1,32 @@
+{
+  "//": "The website's JSDoc gate. Same contract as web/jsconfig.json: annotations are the type system, and checkJs makes them a build step rather than a decoration. TypeScript comes from ../web/node_modules, as Tailwind already does.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "paths": {
+      "/shared/*": [
+        "./client/shared/*"
+      ]
+    }
+  },
+  "include": [
+    "client/**/*.js"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "client/shared/assets"
+  ]
+}

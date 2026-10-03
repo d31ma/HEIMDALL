@@ -1,0 +1,15 @@
+# A nightly batch job: no ports, no replicas, no healthcheck — a scheduled
+# service is not a running service, and render rejects the contradictions.
+services:
+  nightly-report:
+    image: registry.example.com/reports:1.4.2
+    command: ["./report", "--daily"]
+    environment:
+      DATABASE_URL: "${secret:aws-sm/us-east-1/prod/db-url}"
+    x-heimdall-schedule:
+      cron: "0 3 * * *"
+      timezone: UTC
+      concurrency: forbid
+      deadline: 15m
+      timeout: 30m
+      retries: 2

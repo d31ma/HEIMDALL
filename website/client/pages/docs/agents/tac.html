@@ -1,0 +1,31 @@
+<div class="min-h-screen flex flex-col">
+  <site-header></site-header>
+  <main class="flex-1 max-w-[76rem] w-full mx-auto px-[clamp(1rem,4vw,2.5rem)] py-[clamp(1.5rem,4vw,3rem)] lg:flex lg:gap-10">
+    <docs-sidebar></docs-sidebar>
+    <article id="content" class="docs-article min-w-0 flex-1 max-w-[46rem] animate-[site-fade_0.3s_ease-out] max-lg:mt-6">
+      <h1>Agents</h1>
+      <p class="lead">Deploy to hosts the control plane cannot dial — outbound-only, over pinned mTLS.</p>
+
+<h2>The shape</h2>
+<p><code>heimdall agent</code> runs on a Docker Engine host behind NAT or a firewall and connects <em>outbound</em> to the control plane over mTLS. The control plane never dials the host; the agent long-polls for work.</p>
+<h2>Enrollment cannot be intercepted</h2>
+<p>An enrollment token always carries the control plane's certificate fingerprint. The agent pins that fingerprint before sending the token, so its very first connection cannot be machine-in-the-middled — there is no trust-on-first-use window.</p>
+<pre class="site-code"># on the control plane
+heimdall enroll --target tgt_... --lifetime 1h
+# on the host
+heimdall agent enroll --token TOKEN
+heimdall agent run</pre>
+<h2>An agent is not a principal</h2>
+<p>It holds no grant and asks for nothing. It receives the work an <em>already authorized</em> sync produced, for the one target its client certificate names — the identity is read from the TLS verified chain, never from a request field. Compromising a host gains that host's own workloads and nothing else.</p>
+<h2>Offline is normal</h2>
+<p>A sync for an offline agent parks as a durable intent and drains on reconnect as one fresh sync. Secrets for agent targets resolve on the control plane and travel with the job over mTLS; the agent never holds a resolver or a store credential.</p>
+<h2>Metrics without chatter</h2>
+<p>The agent scrapes its own Engine into a local ring buffer and ships completed one-minute rollups on its poll — raw samples never cross the WAN, and shipping is idempotent per instance-minute so a lost acknowledgement cannot double a chart.</p>
+    </article>
+  </main>
+  <footer class="border-t border-[var(--w-border,#e3e3e3)]">
+    <div class="max-w-[76rem] mx-auto px-[clamp(1rem,4vw,2.5rem)] py-6 text-[0.85rem] site-muted">
+      HEIMDALL — GitOps for Docker Compose · v26.33.1
+    </div>
+  </footer>
+</div>
