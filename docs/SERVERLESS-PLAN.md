@@ -99,7 +99,7 @@ Observe supplies deployment health, image, revision and configuration. Lambda
 does not expose stable execution-environment inventory; Instances must not
 manufacture one. Logs/metrics identify functions or versions explicitly.
 
-`Invoke(ctx, target, app, service, payload)` belongs to an optional provider
+`Invoke(ctx, InvocationRequest)` belongs to an optional provider
 invocation interface, distinct from `Runner.RunNow`, which starts existing
 batch jobs. Bound JSON input/output. Map transport failures separately from
 function execution errors; preserve request identity and function version.

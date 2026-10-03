@@ -42,6 +42,7 @@ type Harness struct {
 	Reset               func(t *testing.T)
 	FunctionSupported   func(revision string) spec.DeploySpec
 	InstancesMayBeEmpty bool
+	ChangedImage        func(string) string
 }
 
 // Run executes the suite.
@@ -252,6 +253,13 @@ func testRolloutConverges(t *testing.T, harness Harness) {
 	want := rollout(harness, "rev-rollout", "stop-first")
 
 	plan, err := harness.Provider.Plan(ctx, harness.Target, want)
+	if harness.FunctionSupported != nil && harness.Provider.Capabilities().Of(provider.FeatureStopFirst) == provider.Rejected {
+		var rejection *provider.RejectionError
+		if !errors.As(err, &rejection) {
+			t.Fatalf("unsupported function rollout must be rejected: %v", err)
+		}
+		return
+	}
 	if err != nil {
 		t.Fatalf("plan: %v", err)
 	}
@@ -283,6 +291,13 @@ func testStartFirstRollout(t *testing.T, harness Harness) {
 
 	first := rollout(harness, "rev-sf-1", "start-first")
 	plan, err := harness.Provider.Plan(ctx, harness.Target, first)
+	if harness.FunctionSupported != nil && harness.Provider.Capabilities().Of(provider.FeatureStopFirst) == provider.Rejected {
+		var rejection *provider.RejectionError
+		if !errors.As(err, &rejection) {
+			t.Fatalf("unsupported function rollout must be rejected: %v", err)
+		}
+		return
+	}
 	if err != nil {
 		t.Fatalf("plan: %v", err)
 	}
@@ -296,7 +311,7 @@ func testStartFirstRollout(t *testing.T, harness Harness) {
 	for _, revision := range []string{"rev-sf-2", "rev-sf-3"} {
 		next := rollout(harness, revision, "start-first")
 		for i := range next.Services {
-			next.Services[i].Image += "-" + revision
+			next.Services[i].Image = changedImage(harness, next.Services[i].Image, "-"+revision)
 		}
 		next.Normalize()
 
@@ -562,7 +577,7 @@ func testObserveRevision(t *testing.T, harness Harness) {
 	if err != nil {
 		t.Fatalf("instances: %v", err)
 	}
-	if len(instances) == 0 {
+	if len(instances) == 0 && !harness.InstancesMayBeEmpty {
 		t.Fatal("no instances after a successful apply")
 	}
 	for _, instance := range instances {
@@ -642,7 +657,7 @@ func testDriftIsDetected(t *testing.T, harness Harness) {
 	if len(second.Services) == 0 {
 		t.Fatal("harness produced no services")
 	}
-	second.Services[0].Image = second.Services[0].Image + "-changed"
+	second.Services[0].Image = changedImage(harness, second.Services[0].Image, "-changed")
 	second.Normalize()
 
 	drifted, err := harness.Provider.Plan(ctx, harness.Target, second)
@@ -702,6 +717,13 @@ func changedOperations(plan provider.Plan) []provider.Operation {
 		}
 	}
 	return changed
+}
+
+func changedImage(harness Harness, image, suffix string) string {
+	if harness.ChangedImage != nil {
+		return harness.ChangedImage(image)
+	}
+	return image + suffix
 }
 
 func asRejection(err error, target **provider.RejectionError) bool {
