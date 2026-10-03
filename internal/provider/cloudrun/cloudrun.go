@@ -75,8 +75,7 @@ func (p *Provider) Capabilities() provider.Capabilities {
 			provider.FeaturePorts:     provider.Partial,
 			provider.FeatureMultiPort: provider.Rejected,
 			provider.FeatureDependsOn: provider.Partial,
-			// Startup probes exist; compose healthchecks translate loosely.
-			provider.FeatureHealthcheck: provider.Partial,
+			provider.FeatureHealthcheck: provider.Rejected,
 			provider.FeatureRestart:     provider.Partial,
 			provider.FeatureNamedVolume: provider.Rejected,
 			provider.FeatureBindMount:   provider.Rejected,
@@ -90,7 +89,7 @@ func (p *Provider) Capabilities() provider.Capabilities {
 			provider.FeaturePorts:       "Cloud Run serves one HTTP port per service; the published side of a mapping is ignored",
 			provider.FeatureMultiPort:   "one serving port per Cloud Run service",
 			provider.FeatureDependsOn:   "services are created in wave order; start order belongs to the platform",
-			provider.FeatureHealthcheck: "compose healthchecks become startup probes where expressible",
+			provider.FeatureHealthcheck: "Compose exec healthchecks are not Cloud Run probes; use the platform's native startup and liveness probes",
 			provider.FeatureRestart:     "Cloud Run restarts containers as part of serving; restart policies cannot be expressed",
 			provider.FeatureNamedVolume: "Cloud Run containers have no durable volumes",
 			provider.FeatureBindMount:   "there is no host to bind-mount",
@@ -160,6 +159,10 @@ func (p *Provider) Plan(ctx context.Context, target provider.Target, want spec.D
 	if err := provider.Validate(p.Capabilities(), want); err != nil {
 		return provider.Plan{}, err
 	}
+	runtimeContract := RuntimeContract{}
+	if err := runtimeContract.Validate(want); err != nil {
+		return provider.Plan{}, err
+	}
 	specHash, err := spec.Hash(want)
 	if err != nil {
 		return provider.Plan{}, err
@@ -210,7 +213,7 @@ func (p *Provider) Plan(ctx context.Context, target provider.Target, want spec.D
 			plan.Operations = append(plan.Operations, provider.Operation{
 				Kind: provider.OpCreate, Service: service.Name, Wave: service.Wave, Reason: "not deployed",
 			})
-		case existing.Annotations[annotationServiceHash] != serviceHash:
+		case existing.Annotations[annotationServiceHash] != serviceHash || !runtimeContract.Matches(service, existing):
 			plan.Operations = append(plan.Operations, provider.Operation{
 				Kind: provider.OpUpdate, Service: service.Name, Wave: service.Wave,
 				Reason: "the desired service differs from the deployed one",
@@ -397,8 +400,10 @@ func (p *Provider) serviceDefinition(ctx context.Context, plan provider.Plan, se
 	}
 
 	container := &run.GoogleCloudRunV2Container{
-		Image: service.Image,
-		Env:   environment,
+		Image:   service.Image,
+		Env:     environment,
+		Command: service.Entrypoint,
+		Args:    service.Command,
 	}
 	if len(service.Ports) > 0 {
 		container.Ports = []*run.GoogleCloudRunV2ContainerPort{
