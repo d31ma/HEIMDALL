@@ -1702,6 +1702,418 @@
         "x-heimdall-resource": "project:{project}:app:{app}"
       }
     },
+    "/api/v1/projects/{project}/apps/{app}/services/{service}/invoke": {
+      "post": {
+        "description": "Invoke the declared JSON function once using the stored application target and immutable published version. Input is transient. The API waits at most 45 seconds; a timeout does not cancel native execution and must not trigger automatic retry. A native handler error is returned in function_error with HTTP 200.",
+        "operationId": "post_api_v1_projects_project_apps_app_services_service_invoke",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z0-9._-]+$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z0-9._-]+$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "service",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z0-9._-]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "payload": {
+                    "description": "Any JSON value, including null. Its UTF-8 JSON representation must not exceed 262144 bytes.",
+                    "x-heimdall-max-json-bytes": 262144
+                  }
+                },
+                "required": [
+                  "payload"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Native invocation response: version, request_id, payload, and optional function_error. A handler error does not imply transport failure."
+          },
+          "400": {
+            "description": "Invalid payload, undeclared function, suspended application, or unsupported target routing."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No valid session."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Denied by SESAME. Carries reason_code."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No such application."
+          },
+          "409": {
+            "description": "Native resource ownership or immutable-version conflict."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The compose file uses something this provider cannot express; the message names the offending service."
+          },
+          "501": {
+            "description": "This provider has no qualified direct JSON invocation contract."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Authorization engine unavailable. Never a bypass."
+          },
+          "504": {
+            "description": "The wait ended. Native execution may continue; do not retry automatically."
+          }
+        },
+        "security": [
+          {
+            "sessionBearer": []
+          }
+        ],
+        "summary": "app:run on project:{project}:app:{app}",
+        "x-heimdall-action": "app:run",
+        "x-heimdall-mutating": true,
+        "x-heimdall-resource": "project:{project}:app:{app}"
+      }
+    },
+    "/api/v1/projects/{project}/apps/{app}/services/{service}/logs": {
+      "get": {
+        "operationId": "get_api_v1_projects_project_apps_app_services_service_logs",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z0-9._-]+$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z0-9._-]+$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "service",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z0-9._-]+$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Immutable native function version. Absent resolves the actually observed ready version.",
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Bounded native event tail. Defaults to 200. The response is finite and does not follow new events.",
+            "in": "query",
+            "name": "tail",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "RFC3339 timestamp. Native provider retention and query bounds apply.",
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Resource identifier is not well formed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No valid session."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Denied by SESAME. Carries reason_code."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No such application."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The sync completed with per-service failures."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The compose file uses something this provider cannot express; the message names the offending service."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Authorization engine unavailable. Never a bypass."
+          }
+        },
+        "security": [
+          {
+            "sessionBearer": []
+          }
+        ],
+        "summary": "observe:logs on project:{project}:app:{app}",
+        "x-heimdall-action": "observe:logs",
+        "x-heimdall-mutating": false,
+        "x-heimdall-resource": "project:{project}:app:{app}"
+      }
+    },
+    "/api/v1/projects/{project}/apps/{app}/services/{service}/metrics": {
+      "get": {
+        "operationId": "get_api_v1_projects_project_apps_app_services_service_metrics",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z0-9._-]+$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z0-9._-]+$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "service",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z0-9._-]+$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Immutable native function version. Absent resolves the actually observed ready version.",
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Positive Go duration, such as 15m or 24h. Absent defaults to the native one-hour window. Native Lambda telemetry accepts at most 24h. No execution instance ID is required.",
+            "in": "query",
+            "name": "window",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Resource identifier is not well formed."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No valid session."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Denied by SESAME. Carries reason_code."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No such application."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The sync completed with per-service failures."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The compose file uses something this provider cannot express; the message names the offending service."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Authorization engine unavailable. Never a bypass."
+          }
+        },
+        "security": [
+          {
+            "sessionBearer": []
+          }
+        ],
+        "summary": "observe:metrics on project:{project}:app:{app}",
+        "x-heimdall-action": "observe:metrics",
+        "x-heimdall-mutating": false,
+        "x-heimdall-resource": "project:{project}:app:{app}"
+      }
+    },
     "/api/v1/projects/{project}/apps/{app}/services/{service}/run": {
       "post": {
         "operationId": "post_api_v1_projects_project_apps_app_services_service_run",

@@ -1,10 +1,10 @@
 # Native Azure Functions adapter source
 
-Status: source remains unregistered and live Azure qualification is absent. The
-parent reports Azure, Lambda, all-provider and Node tests passed at checkpoint
-`7bb10d847fd7559537b4aa4cb31febe4bff7ab10`. The subsequent cohesion refactor and
-new diagnostic/target-definition/version assertions are source-only: they have
-not been compiled or tested. No Functions image is qualified by this work.
+Status: registration and focused API/registry integration passed locally on
+2026-10-03. The cohesion refactor and diagnostic/target-definition/version
+assertions passed native SDK protocol/conformance tests at 92.4% statement
+coverage. Full regression, method-level CRAP and app/browser acceptance remain
+pending. No Functions image or live Azure account is qualified by this work.
 
 The adapter uses the pinned azcore ARM pipeline and armappcontainers/v3 models,
 adding a typed resource envelope for `kind=functionapp` at API `2026-07-01`.

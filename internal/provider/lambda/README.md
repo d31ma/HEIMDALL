@@ -1,6 +1,8 @@
 # Lambda workload adapter
 
-Status: local SDK/protocol conformance passed; adapter is not registered.
+Status: adapter registration and focused API/registry integration passed locally
+on 2026-10-03; native SDK/protocol conformance passed at 88.2% statement coverage.
+Full regression, method-level CRAP and app/browser acceptance remain pending.
 Native image/runtime and live AWS validation remain missing.
 
 The control plane stays long-lived. This adapter manages image-based default

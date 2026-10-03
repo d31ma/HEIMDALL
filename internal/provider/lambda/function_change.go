@@ -58,7 +58,7 @@ func (functionChange) metadata(live *awslambda.GetFunctionOutput) (map[string]st
 }
 func (functionChange) requireOwnership(missing, readable, owned bool, message string) error {
 	if !missing && (!readable || !owned) {
-		return (Diagnostic{}).Format((Diagnostic{}).OwnershipCode(), message)
+		return &Diagnostic{Code: (Diagnostic{}).OwnershipCode(), Message: message}
 	}
 	return nil
 }
@@ -180,7 +180,7 @@ func (c *functionChange) converged() error {
 }
 func (functionChange) requireMatch(matches bool, message string) error {
 	if !matches {
-		return (Diagnostic{}).Format((Diagnostic{}).ReadinessCode(), message)
+		return &Diagnostic{Code: (Diagnostic{}).ReadinessCode(), Message: message}
 	}
 	return nil
 }

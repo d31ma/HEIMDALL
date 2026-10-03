@@ -1,7 +1,8 @@
 # Serverless workload providers
 
-Status: local provider protocol checkpoint `7bb10d8` passed. Registration, API/UI
-integration and method-cohesion continuation are source candidates pending validation.
+Status: native SDK protocol/conformance and focused API/registry/Node integration
+passed on 2026-10-03. Full regression, method-level CRAP, native image tests and
+qualified compiler 28 app/browser acceptance remain pending.
 Research checked against official provider documentation on 2026-10-03.
 
 The project is DELMA/HEIMDALL. The working baseline includes existing uncommitted
@@ -281,8 +282,9 @@ Sources: [Container Apps metrics](https://learn.microsoft.com/en-us/azure/azure-
 The isolated branch now registers Lambda and Azure Functions, validates native
 routing before agent dispatch and target/registry writes, and uses a shared
 first-error sequence model for cohesive provider orchestration. This candidate
-has not yet compiled or passed tests; the preceding local SDK protocol passes
-apply only to `7bb10d8`.
+passed compilation, native protocol/conformance and focused API/registry tests
+in the next bounded validation slot. The preceding `7bb10d8` checkpoint remains
+preserved; the exact candidate and repair hashes are in the slot receipt.
 
 The API adds the declared-service invocation route above using the existing
 SESAME `app:run` action. Input is limited to 256 KiB JSON and a 384 KiB envelope;
@@ -299,6 +301,7 @@ and returns an explicit unavailable result.
 The application page projects declared function contracts and observed versions,
 keeps empty execution inventory separate from deployment health, and offers one
 JSON invocation for the Lambda contract without retry. Ordinary and scheduled
-workload behavior remains under regression checks. New API, source-cohesion and
-browser checks require the next coordinated validation slot. Generated contract
-files will be updated only through `heimdall contract` in that slot.
+workload behavior remains under regression checks. New API/registry checks and Node function/gateway checks passed. The native
+packages recorded 88.2% Lambda and 92.4% Azure statement coverage. Generated
+contract files were refreshed through `heimdall contract`; full-suite freshness
+checks and compiler 28 browser acceptance require the next coordinated slot.

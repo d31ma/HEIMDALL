@@ -6,7 +6,6 @@ type templateComparison struct{}
 
 func (c templateComparison) matches(template, expected *nativeTemplate) bool {
 	actual := c.value(template)
-	desired := c.value(expected)
 	return (comparisonChecks{}).all([]bool{
 		c.present(template, expected),
 		len(actual.InitContainers) == 0,
