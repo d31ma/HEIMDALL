@@ -54,8 +54,8 @@ func (p *Provider) capabilities() provider.Capabilities {
 }
 
 func (p *Provider) configuration(ctx context.Context, target provider.Target) (aws.Config, error) {
-	if target.Region == "" {
-		return aws.Config{}, (Diagnostic{}).Format("HD0410: Lambda target requires region")
+	if err := (TargetContract{Target: target}).Validate(); err != nil {
+		return aws.Config{}, err
 	}
 	transport := p.HTTPClient
 	if transport == nil {
@@ -92,15 +92,15 @@ func (p *Provider) client(ctx context.Context, target provider.Target) (*awslamb
 
 func (p *Provider) credential(ctx context.Context, target provider.Target) (aws.CredentialsProvider, error) {
 	if p.SecretResolver == nil {
-		return nil, (Diagnostic{}).Format("HD0411: Lambda credential reference requires a resolver")
+		return nil, (Diagnostic{}).Format((Diagnostic{}).CredentialCode(), "Lambda credential reference requires a resolver")
 	}
 	raw, err := p.SecretResolver(ctx, target.CredentialRef)
 	if err != nil {
-		return nil, (Diagnostic{}).Format("HD0411: Lambda credential reference could not be resolved")
+		return nil, (Diagnostic{}).Format((Diagnostic{}).CredentialCode(), "Lambda credential reference could not be resolved")
 	}
 	var parsed awsCredential
 	if json.Unmarshal([]byte(raw), &parsed) != nil || parsed.AccessKeyID == "" || parsed.SecretAccessKey == "" {
-		return nil, (Diagnostic{}).Format("HD0411: Lambda credential reference requires access_key_id and secret_access_key JSON")
+		return nil, (Diagnostic{}).Format((Diagnostic{}).CredentialCode(), "Lambda credential reference requires access_key_id and secret_access_key JSON")
 	}
 	return credentials.NewStaticCredentialsProvider(parsed.AccessKeyID, parsed.SecretAccessKey, parsed.SessionToken), nil
 }
@@ -174,7 +174,7 @@ func (p *Provider) available(ctx context.Context, client *awslambda.Client, iden
 	if err != nil {
 		return err
 	}
-	return (Diagnostic{}).Format("HD0414: desired function name already exists outside the verified application inventory; inspect ownership and re-plan")
+	return (Diagnostic{}).Format((Diagnostic{}).OwnershipCode(), "desired function name already exists outside the verified application inventory; inspect ownership and re-plan")
 }
 
 func (p *Provider) functions(ctx context.Context, client *awslambda.Client, app provider.AppRef) (map[string]FunctionState, error) {
@@ -197,17 +197,17 @@ func (p *Provider) functions(ctx context.Context, client *awslambda.Client, app 
 				return nil, err
 			}
 			if found.TagsError != nil {
-				return nil, (Diagnostic{}).Format("HD0412: Lambda ownership metadata is unreadable")
+				return nil, (Diagnostic{}).Format((Diagnostic{}).InventoryCode(), "Lambda ownership metadata is unreadable")
 			}
 			if !(Identity{App: app}).Owns(found.Tags) {
 				continue
 			}
 			service := found.Tags["dev.delma.heimdall.service"]
 			if service == "" || name != (Identity{App: app, Service: service}).Name() {
-				return nil, (Diagnostic{}).Format("HD0412: Lambda function identity does not match its resource name")
+				return nil, (Diagnostic{}).Format((Diagnostic{}).InventoryCode(), "Lambda function identity does not match its resource name")
 			}
 			if _, duplicate := result[service]; duplicate {
-				return nil, (Diagnostic{}).Format("HD0412: duplicate Lambda service identity")
+				return nil, (Diagnostic{}).Format((Diagnostic{}).InventoryCode(), "duplicate Lambda service identity")
 			}
 			state := FunctionState{Live: found}
 			version := found.Tags["dev.delma.heimdall.function-version"]
@@ -227,11 +227,11 @@ func (p *Provider) functions(ctx context.Context, client *awslambda.Client, app 
 			return result, nil
 		}
 		if aws.ToString(marker) == aws.ToString(listed.NextMarker) {
-			return nil, (Diagnostic{}).Format("HD0412: Lambda pagination did not advance")
+			return nil, (Diagnostic{}).Format((Diagnostic{}).InventoryCode(), "Lambda pagination did not advance")
 		}
 		marker = listed.NextMarker
 	}
-	return nil, (Diagnostic{}).Format("HD0412: Lambda inventory exceeds 100 pages")
+	return nil, (Diagnostic{}).Format((Diagnostic{}).InventoryCode(), "Lambda inventory exceeds 100 pages")
 }
 
 func (p *Provider) Apply(ctx context.Context, target provider.Target, plan provider.Plan) (provider.Result, error) {
@@ -241,7 +241,7 @@ func (p *Provider) Apply(ctx context.Context, target provider.Target, plan provi
 func (p *Provider) apply(ctx context.Context, target provider.Target, plan provider.Plan) (provider.Result, error) {
 	opts, ok := ctx.Value(applyKey{}).(ApplyOptions)
 	if !ok {
-		return provider.Result{}, (Diagnostic{}).Format("HD0413: Lambda apply requires ApplyOptions.WithContext")
+		return provider.Result{}, (Diagnostic{}).Format((Diagnostic{}).ApplyCode(), "Lambda apply requires ApplyOptions.WithContext")
 	}
 	hash, err := spec.Hash(opts.Spec)
 	if err != nil {
@@ -252,7 +252,7 @@ func (p *Provider) apply(ctx context.Context, target provider.Target, plan provi
 		project = "default"
 	}
 	if hash != plan.SpecHash || plan.Target != target.ID || plan.App.App != opts.Spec.App || plan.App.Project != project {
-		return provider.Result{}, (Diagnostic{}).Format("HD0413: Lambda plan and apply target/spec differ; re-plan")
+		return provider.Result{}, (Diagnostic{}).Format((Diagnostic{}).ApplyCode(), "Lambda plan and apply target/spec differ; re-plan")
 	}
 	if err := (RuntimeContract{Target: target, Spec: opts.Spec}).Validate(); err != nil {
 		return provider.Result{}, err
@@ -284,7 +284,7 @@ func (p *Provider) waitMetadata(ctx context.Context, client *awslambda.Client, i
 			return err
 		}
 		if live.TagsError != nil {
-			return (Diagnostic{}).Format("HD0415: Lambda revision metadata cannot be verified")
+			return (Diagnostic{}).Format((Diagnostic{}).ReadinessCode(), "Lambda revision metadata cannot be verified")
 		}
 		matches := true
 		for key, value := range tags {
@@ -309,17 +309,17 @@ func (p *Provider) environment(ctx context.Context, s spec.Service) (*types.Envi
 		value := setting.Value
 		if setting.Ref != "" {
 			if p.SecretResolver == nil {
-				return nil, (Diagnostic{}).Format("HD0416: function %s requires an environment secret resolver", s.Name)
+				return nil, (Diagnostic{}).Format((Diagnostic{}).EnvironmentCode(), "function %s requires an environment secret resolver", s.Name)
 			}
 			resolved, err := p.SecretResolver(ctx, setting.Ref)
 			if err != nil {
-				return nil, (Diagnostic{}).Format("HD0416: function %s environment reference could not be resolved", s.Name)
+				return nil, (Diagnostic{}).Format((Diagnostic{}).EnvironmentCode(), "function %s environment reference could not be resolved", s.Name)
 			}
 			value = resolved
 		}
 		bytes += len(setting.Key) + len(value)
 		if bytes > 4096 {
-			return nil, (Diagnostic{}).Format("HD0416: Lambda environment exceeds 4096 bytes")
+			return nil, (Diagnostic{}).Format((Diagnostic{}).EnvironmentCode(), "Lambda environment exceeds 4096 bytes")
 		}
 		env.Variables[setting.Key] = value
 	}
@@ -338,7 +338,7 @@ func (p *Provider) waitReady(ctx context.Context, client *awslambda.Client, name
 		}
 		c := live.Configuration
 		if c != nil && (c.State == types.StateFailed || c.LastUpdateStatus == types.LastUpdateStatusFailed) {
-			return nil, (Diagnostic{}).Format("HD0415: Lambda deployment failed; inspect native function state and update diagnostics")
+			return nil, (Diagnostic{}).Format((Diagnostic{}).ReadinessCode(), "Lambda deployment failed; inspect native function state and update diagnostics")
 		}
 		if c != nil && c.State == types.StateActive && (version != "" || c.LastUpdateStatus == types.LastUpdateStatusSuccessful) {
 			return live, nil
@@ -420,7 +420,7 @@ func (p *Provider) instances(ctx context.Context, target provider.Target, app pr
 }
 
 func (p *Provider) Metrics(ctx context.Context, target provider.Target, instance provider.InstanceRef, window provider.Window) (provider.Series, error) {
-	return provider.Series{}, (Diagnostic{}).Format("HD0417: Lambda exposes function/version invocation metrics, not per-container CPU or memory series")
+	return provider.Series{}, (Diagnostic{}).Format((Diagnostic{}).ObservationCode(), "Lambda exposes function/version invocation metrics, not per-container CPU or memory series")
 }
 
 func (p *Provider) FunctionMetrics(ctx context.Context, target provider.Target, ref provider.FunctionRef, window provider.Window) (provider.FunctionSeries, error) {
@@ -432,7 +432,7 @@ func (p *Provider) FunctionLogs(ctx context.Context, target provider.Target, ref
 }
 
 func (p *Provider) Logs(ctx context.Context, target provider.Target, instance provider.InstanceRef, filter provider.LogFilter) (io.ReadCloser, error) {
-	return nil, (Diagnostic{}).Format("HD0417: Lambda logs require a native CloudWatch function/version stream; execution environments have no stable instance IDs")
+	return nil, (Diagnostic{}).Format((Diagnostic{}).ObservationCode(), "Lambda logs require a native CloudWatch function/version stream; execution environments have no stable instance IDs")
 }
 
 func (p *Provider) Events(ctx context.Context, target provider.Target, app provider.AppRef) ([]provider.Event, error) {
@@ -447,7 +447,7 @@ func (p *Provider) Invoke(ctx context.Context, request provider.InvocationReques
 func (p *Provider) invoke(ctx context.Context, request provider.InvocationRequest) (provider.Invocation, error) {
 	target, app, service, payload := request.Target, request.App, request.Service, request.Payload
 	if len(payload) > 6*1024*1024 || !json.Valid(payload) {
-		return provider.Invocation{}, (Diagnostic{}).Format("HD0418: direct Lambda payload must be valid JSON within 6 MiB")
+		return provider.Invocation{}, (Diagnostic{}).Format((Diagnostic{}).InvocationCode(), "direct Lambda payload must be valid JSON within 6 MiB")
 	}
 	client, err := p.client(ctx, target)
 	if err != nil {
@@ -459,11 +459,11 @@ func (p *Provider) invoke(ctx context.Context, request provider.InvocationReques
 		return provider.Invocation{}, err
 	}
 	if live.TagsError != nil || !id.Owns(live.Tags) {
-		return provider.Invocation{}, (Diagnostic{}).Format("HD0414: Lambda function belongs outside this application")
+		return provider.Invocation{}, (Diagnostic{}).Format((Diagnostic{}).OwnershipCode(), "Lambda function belongs outside this application")
 	}
 	version := live.Tags["dev.delma.heimdall.function-version"]
 	if number, err := strconv.Atoi(version); err != nil || number < 1 {
-		return provider.Invocation{}, (Diagnostic{}).Format("HD0418: no converged immutable Lambda version is available")
+		return provider.Invocation{}, (Diagnostic{}).Format((Diagnostic{}).InvocationCode(), "no converged immutable Lambda version is available")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 905*time.Second)
 	defer cancel()
@@ -472,10 +472,10 @@ func (p *Provider) invoke(ctx context.Context, request provider.InvocationReques
 		return provider.Invocation{}, err
 	}
 	if invoked.StatusCode != 200 || aws.ToString(invoked.ExecutedVersion) != version {
-		return provider.Invocation{}, (Diagnostic{}).Format("HD0418: Lambda returned an unexpected invocation status or version")
+		return provider.Invocation{}, (Diagnostic{}).Format((Diagnostic{}).InvocationCode(), "Lambda returned an unexpected invocation status or version")
 	}
 	if !json.Valid(invoked.Payload) {
-		return provider.Invocation{}, (Diagnostic{}).Format("HD0418: direct Lambda response is not valid JSON")
+		return provider.Invocation{}, (Diagnostic{}).Format((Diagnostic{}).InvocationCode(), "direct Lambda response is not valid JSON")
 	}
 	requestID, _ := awsmiddleware.GetRequestIDMetadata(invoked.ResultMetadata)
 	return provider.Invocation{RequestID: requestID, Version: version, Payload: invoked.Payload, FunctionError: aws.ToString(invoked.FunctionError)}, nil

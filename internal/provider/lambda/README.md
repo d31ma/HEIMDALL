@@ -66,3 +66,13 @@ Sources checked on 2026-10-03:
 - [Configuration update API](https://docs.aws.amazon.com/lambda/latest/api/API_UpdateFunctionConfiguration.html)
 - [Function metrics](https://docs.aws.amazon.com/lambda/latest/dg/monitoring-metrics-types.html)
 - [Native logs](https://docs.aws.amazon.com/lambda/latest/dg/monitoring-cloudwatchlogs-view.html)
+
+
+Continuation source review adds structured diagnostic codes, named code values,
+and a bounded-response reader split into single-decision helpers. It also
+rejects missing/mismatched target identity and unimplemented agent/endpoint
+routing before SDK access in Plan, Observe and Invoke. Target role/settings
+validation is shared across those provider paths. These continuation changes
+and their target refusal cases remain unexecuted while the framework takes the
+first heavy lane. The initial passed checkpoint and later untested candidates
+remain separate receipts.

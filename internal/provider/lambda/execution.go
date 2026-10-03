@@ -30,7 +30,7 @@ func (operation execution) run(ctx context.Context) error {
 		return err
 	}
 	if err == nil && (existing.TagsError != nil || !id.Owns(existing.Tags)) {
-		return (Diagnostic{}).Format("HD0414: resource name is owned outside this HEIMDALL application")
+		return (Diagnostic{}).Format((Diagnostic{}).OwnershipCode(), "resource name is owned outside this HEIMDALL application")
 	}
 	if op.Kind == provider.OpDelete {
 		if missing != nil {
@@ -43,11 +43,11 @@ func (operation execution) run(ctx context.Context) error {
 		return operation.adapter.waitDeleted(ctx, client, id.Name())
 	}
 	if op.Kind != provider.OpCreate && op.Kind != provider.OpUpdate {
-		return (Diagnostic{}).Format("HD0414: unsupported Lambda operation %s", op.Kind)
+		return (Diagnostic{}).Format((Diagnostic{}).OwnershipCode(), "unsupported Lambda operation %s", op.Kind)
 	}
 	s, ok := want.Service(op.Service)
 	if !ok {
-		return (Diagnostic{}).Format("HD0414: operation names a function absent from desired state")
+		return (Diagnostic{}).Format((Diagnostic{}).OwnershipCode(), "operation names a function absent from desired state")
 	}
 	env, err := operation.adapter.environment(ctx, s)
 	if err != nil {
@@ -60,15 +60,15 @@ func (operation execution) run(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		_, err = client.CreateFunction(ctx, &awslambda.CreateFunctionInput{FunctionName: aws.String(id.Name()), PackageType: types.PackageTypeImage, Code: &types.FunctionCode{ImageUri: aws.String(s.Image)}, Role: aws.String(target.Config["execution_role_arn"]), Timeout: aws.Int32(sizing.Timeout(s)), MemorySize: aws.Int32(sizing.Memory(s)), Architectures: []types.Architecture{sizing.Architecture(s)}, Environment: env, ImageConfig: imageConfig, Tags: tags})
+		_, err = client.CreateFunction(ctx, &awslambda.CreateFunctionInput{FunctionName: aws.String(id.Name()), PackageType: types.PackageTypeImage, Code: &types.FunctionCode{ImageUri: aws.String(s.Image)}, Role: aws.String(target.Config[(TargetContract{}).ExecutionRoleKey()]), Timeout: aws.Int32(sizing.Timeout(s)), MemorySize: aws.Int32(sizing.Memory(s)), Architectures: []types.Architecture{sizing.Architecture(s)}, Environment: env, ImageConfig: imageConfig, Tags: tags})
 		if err != nil {
 			return err
 		}
 	} else {
 		if existing.Configuration == nil || existing.Configuration.CapacityProviderConfig != nil || existing.Configuration.DurableConfig != nil {
-			return (Diagnostic{}).Format("HD0414: default Lambda cannot update a managed-instance or durable function")
+			return (Diagnostic{}).Format((Diagnostic{}).OwnershipCode(), "default Lambda cannot update a managed-instance or durable function")
 		}
-		_, err = client.UpdateFunctionConfiguration(ctx, &awslambda.UpdateFunctionConfigurationInput{FunctionName: aws.String(id.Name()), RevisionId: existing.Configuration.RevisionId, Role: aws.String(target.Config["execution_role_arn"]), Timeout: aws.Int32(sizing.Timeout(s)), MemorySize: aws.Int32(sizing.Memory(s)), Environment: env, ImageConfig: imageConfig})
+		_, err = client.UpdateFunctionConfiguration(ctx, &awslambda.UpdateFunctionConfigurationInput{FunctionName: aws.String(id.Name()), RevisionId: existing.Configuration.RevisionId, Role: aws.String(target.Config[(TargetContract{}).ExecutionRoleKey()]), Timeout: aws.Int32(sizing.Timeout(s)), MemorySize: aws.Int32(sizing.Memory(s)), Environment: env, ImageConfig: imageConfig})
 		if err != nil {
 			return err
 		}
@@ -77,7 +77,7 @@ func (operation execution) run(ctx context.Context) error {
 			return err
 		}
 		if configured.TagsError != nil || !id.Owns(configured.Tags) {
-			return (Diagnostic{}).Format("HD0414: Lambda ownership changed before code update; re-plan")
+			return (Diagnostic{}).Format((Diagnostic{}).OwnershipCode(), "Lambda ownership changed before code update; re-plan")
 		}
 		_, err = client.UpdateFunctionCode(ctx, &awslambda.UpdateFunctionCodeInput{FunctionName: aws.String(id.Name()), RevisionId: configured.Configuration.RevisionId, ImageUri: aws.String(s.Image), Architectures: []types.Architecture{sizing.Architecture(s)}})
 		if err != nil {
@@ -89,24 +89,24 @@ func (operation execution) run(ctx context.Context) error {
 		return err
 	}
 	if !(FunctionState{}).matchesImage(ready, s) || !(FunctionState{}).matchesConfiguration(ready.Configuration, target, s) {
-		return (Diagnostic{}).Format("HD0415: native Lambda code/configuration did not converge")
+		return (Diagnostic{}).Format((Diagnostic{}).ReadinessCode(), "native Lambda code/configuration did not converge")
 	}
 	if ready.TagsError != nil || !id.Owns(ready.Tags) {
-		return (Diagnostic{}).Format("HD0414: Lambda ownership changed before publication; re-plan")
+		return (Diagnostic{}).Format((Diagnostic{}).OwnershipCode(), "Lambda ownership changed before publication; re-plan")
 	}
 	version, err := (publication{client: client, identity: id, ready: ready, target: target, service: s}).Version(ctx)
 	if err != nil {
 		return err
 	}
 	if number, err := strconv.Atoi(version); err != nil || number < 1 {
-		return (Diagnostic{}).Format("HD0415: Lambda did not return an immutable published version")
+		return (Diagnostic{}).Format((Diagnostic{}).ReadinessCode(), "Lambda did not return an immutable published version")
 	}
 	immutable, err := operation.adapter.waitReady(ctx, client, id.Name(), version)
 	if err != nil {
 		return err
 	}
 	if !(FunctionState{Live: ready, Published: immutable}).Matches(target, s) {
-		return (Diagnostic{}).Format("HD0415: published Lambda configuration did not converge")
+		return (Diagnostic{}).Format((Diagnostic{}).ReadinessCode(), "published Lambda configuration did not converge")
 	}
 	tags, err := id.Tags(plan, s, version)
 	if err != nil {
@@ -117,7 +117,7 @@ func (operation execution) run(ctx context.Context) error {
 		return err
 	}
 	if owned.TagsError != nil || !id.Owns(owned.Tags) {
-		return (Diagnostic{}).Format("HD0414: Lambda ownership changed before metadata update; re-plan")
+		return (Diagnostic{}).Format((Diagnostic{}).OwnershipCode(), "Lambda ownership changed before metadata update; re-plan")
 	}
 	_, err = client.TagResource(ctx, &awslambda.TagResourceInput{Resource: owned.Configuration.FunctionArn, Tags: tags})
 	if err != nil {

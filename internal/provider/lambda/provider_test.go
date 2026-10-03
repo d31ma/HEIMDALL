@@ -69,8 +69,10 @@ func TestLambdaRejectsOrdinaryImageBeforeClientAccess(t *testing.T) {
 func TestLambdaRejectsUnimplementedTargetSettings(t *testing.T) {
 	h, _, _ := harness(t)
 	h.Target.Config["subnets"] = "subnet-existing"
-	if _, err := h.Provider.Plan(context.Background(), h.Target, functionSpec("unimplemented")); err == nil || !strings.Contains(err.Error(), "subnets") {
-		t.Fatalf("network setting was silently ignored: %v", err)
+	_, err := h.Provider.Plan(context.Background(), h.Target, functionSpec("unimplemented"))
+	var diagnostic *lambda.Diagnostic
+	if !errors.As(err, &diagnostic) || diagnostic.Code != "HD0410" || diagnostic.DiagnosticCode() != "HD0410" || !strings.Contains(diagnostic.Message, "subnets") {
+		t.Fatalf("network setting did not produce a structured target diagnostic: %v", err)
 	}
 }
 
@@ -361,6 +363,36 @@ func TestLambdaStopsAfterOwnershipChangesDuringUpdate(t *testing.T) {
 				if strings.HasPrefix(mutation, "tag:") || strings.Contains(mutation, "second") || phase == "configure" && strings.HasPrefix(mutation, "code:") || phase != "publish" && strings.HasPrefix(mutation, "publish:") {
 					t.Fatalf("mutation crossed ownership-loss boundary: %v", fake.mutations)
 				}
+			}
+		})
+	}
+}
+
+func TestLambdaTargetContractRejectsIgnoredRoutingBeforeSDKAccess(t *testing.T) {
+	mutations := map[string]func(*provider.Target){
+		"missing-id":     func(target *provider.Target) { target.ID = "" },
+		"wrong-provider": func(target *provider.Target) { target.Provider = "cloudrun" },
+		"missing-region": func(target *provider.Target) { target.Region = "" },
+		"agent":          func(target *provider.Target) { target.AgentID = "agent-existing" },
+		"endpoint":       func(target *provider.Target) { target.Endpoint = "https://handler.example.invalid" },
+	}
+	for name, mutate := range mutations {
+		t.Run(name, func(t *testing.T) {
+			h, fake, adapter := harness(t)
+			mutate(&h.Target)
+			_, planErr := adapter.Plan(context.Background(), h.Target, functionSpec("invalid-target"))
+			_, observeErr := adapter.Observe(context.Background(), h.Target, provider.AppRef{Project: "conf", App: "events"})
+			_, invokeErr := adapter.Invoke(context.Background(), provider.InvocationRequest{Target: h.Target, App: provider.AppRef{Project: "conf", App: "events"}, Service: "handler", Payload: []byte(`{}`)})
+			for _, err := range []error{planErr, observeErr, invokeErr} {
+				var diagnostic *lambda.Diagnostic
+				if !errors.As(err, &diagnostic) || diagnostic.Code != "HD0410" {
+					t.Fatalf("ignored routing did not produce a structured refusal: %v", err)
+				}
+			}
+			fake.mu.Lock()
+			defer fake.mu.Unlock()
+			if fake.requests != 0 {
+				t.Fatalf("invalid target reached native SDK endpoint %d times", fake.requests)
 			}
 		})
 	}

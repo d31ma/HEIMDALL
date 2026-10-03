@@ -24,7 +24,7 @@ type functionObservation struct {
 
 func (o functionObservation) function(ctx context.Context) (*awslambda.GetFunctionOutput, error) {
 	if version, err := strconv.Atoi(o.ref.Version); err != nil || version < 1 {
-		return nil, (Diagnostic{}).Format("HD0417: function observation requires an immutable version")
+		return nil, (Diagnostic{}).Format((Diagnostic{}).ObservationCode(), "function observation requires an immutable version")
 	}
 	client, err := o.adapter.client(ctx, o.target)
 	if err != nil {
@@ -36,7 +36,7 @@ func (o functionObservation) function(ctx context.Context) (*awslambda.GetFuncti
 		return nil, err
 	}
 	if current.TagsError != nil || !identity.Owns(current.Tags) {
-		return nil, (Diagnostic{}).Format("HD0414: function observation belongs outside this application")
+		return nil, (Diagnostic{}).Format((Diagnostic{}).OwnershipCode(), "function observation belongs outside this application")
 	}
 	return client.GetFunction(ctx, &awslambda.GetFunctionInput{FunctionName: aws.String(identity.Name()), Qualifier: aws.String(o.ref.Version)})
 }
@@ -57,7 +57,7 @@ func (o functionObservation) metrics(ctx context.Context, window provider.Window
 		window.Step = time.Minute
 	}
 	if !window.From.Before(window.To) || window.To.Sub(window.From) > 24*time.Hour || window.Step < time.Minute || window.Step > time.Hour || window.Step%time.Minute != 0 {
-		return provider.FunctionSeries{}, (Diagnostic{}).Format("HD0417: metric window must be at most 24 hours with whole-minute periods")
+		return provider.FunctionSeries{}, (Diagnostic{}).Format((Diagnostic{}).ObservationCode(), "metric window must be at most 24 hours with whole-minute periods")
 	}
 	configuration, err := o.adapter.configuration(ctx, o.target)
 	if err != nil {
@@ -82,7 +82,7 @@ func (o functionObservation) metrics(ctx context.Context, window provider.Window
 		}
 		for _, metric := range result.MetricDataResults {
 			if len(metric.Timestamps) != len(metric.Values) || metric.StatusCode != cwtypes.StatusCodeComplete && metric.StatusCode != cwtypes.StatusCodePartialData {
-				return provider.FunctionSeries{}, (Diagnostic{}).Format("HD0417: native Lambda metrics are incomplete or malformed")
+				return provider.FunctionSeries{}, (Diagnostic{}).Format((Diagnostic{}).ObservationCode(), "native Lambda metrics are incomplete or malformed")
 			}
 			samples := []provider.Sample{}
 			for index, at := range metric.Timestamps {
@@ -104,11 +104,11 @@ func (o functionObservation) metrics(ctx context.Context, window provider.Window
 			return series, nil
 		}
 		if aws.ToString(result.NextToken) == aws.ToString(token) {
-			return provider.FunctionSeries{}, (Diagnostic{}).Format("HD0417: native metric pagination did not advance")
+			return provider.FunctionSeries{}, (Diagnostic{}).Format((Diagnostic{}).ObservationCode(), "native metric pagination did not advance")
 		}
 		token = result.NextToken
 	}
-	return provider.FunctionSeries{}, (Diagnostic{}).Format("HD0417: native metric query exceeded 20 pages")
+	return provider.FunctionSeries{}, (Diagnostic{}).Format((Diagnostic{}).ObservationCode(), "native metric query exceeded 20 pages")
 }
 
 func (o functionObservation) order(series *provider.FunctionSeries) {
@@ -119,7 +119,7 @@ func (o functionObservation) order(series *provider.FunctionSeries) {
 
 func (o functionObservation) logs(ctx context.Context, filter provider.LogFilter) (io.ReadCloser, error) {
 	if filter.Follow {
-		return nil, (Diagnostic{}).Format("HD0417: Lambda function logs use bounded polling, not live follow")
+		return nil, (Diagnostic{}).Format((Diagnostic{}).ObservationCode(), "Lambda function logs use bounded polling, not live follow")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
@@ -165,7 +165,7 @@ func (o functionObservation) logs(ctx context.Context, filter provider.LogFilter
 		for _, event := range result.Events {
 			message := aws.ToString(event.Message)
 			if builder.Len()+len(message)+1 > 4*1024*1024 {
-				return nil, (Diagnostic{}).Format("HD0417: function log output exceeds 4 MiB")
+				return nil, (Diagnostic{}).Format((Diagnostic{}).ObservationCode(), "function log output exceeds 4 MiB")
 			}
 			builder.WriteString(message)
 			builder.WriteByte('\n')
@@ -178,11 +178,11 @@ func (o functionObservation) logs(ctx context.Context, filter provider.LogFilter
 			return io.NopCloser(strings.NewReader(builder.String())), nil
 		}
 		if aws.ToString(result.NextToken) == aws.ToString(input.NextToken) {
-			return nil, (Diagnostic{}).Format("HD0417: native log pagination did not advance")
+			return nil, (Diagnostic{}).Format((Diagnostic{}).ObservationCode(), "native log pagination did not advance")
 		}
 		input.NextToken = result.NextToken
 	}
-	return nil, (Diagnostic{}).Format("HD0417: function log query exceeded 20 pages")
+	return nil, (Diagnostic{}).Format((Diagnostic{}).ObservationCode(), "function log query exceeded 20 pages")
 }
 
 func (o functionObservation) streams(ctx context.Context, client *cloudwatchlogs.Client, group string) ([]string, error) {
@@ -199,15 +199,15 @@ func (o functionObservation) streams(ctx context.Context, client *cloudwatchlogs
 			}
 		}
 		if len(streams) > 100 {
-			return nil, (Diagnostic{}).Format("HD0417: version has more than 100 native log streams; narrow the native query")
+			return nil, (Diagnostic{}).Format((Diagnostic{}).ObservationCode(), "version has more than 100 native log streams; narrow the native query")
 		}
 		if aws.ToString(result.NextToken) == "" {
 			return streams, nil
 		}
 		if aws.ToString(result.NextToken) == aws.ToString(input.NextToken) {
-			return nil, (Diagnostic{}).Format("HD0417: native stream pagination did not advance")
+			return nil, (Diagnostic{}).Format((Diagnostic{}).ObservationCode(), "native stream pagination did not advance")
 		}
 		input.NextToken = result.NextToken
 	}
-	return nil, (Diagnostic{}).Format("HD0417: native stream inventory exceeded 20 pages")
+	return nil, (Diagnostic{}).Format((Diagnostic{}).ObservationCode(), "native stream inventory exceeded 20 pages")
 }

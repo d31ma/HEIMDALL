@@ -72,8 +72,13 @@ zero reported replicas and minimum zero when health is None or Healthy. This
 last combination models an idle scale-to-zero deployment; the exact running/
 health state combination returned by native Functions at API `2026-07-01` has
 not been observed live. Missing or unknown states stay Progressing.
-The revision endpoint and field names are supported by the official REST
-schema and pinned SDK; the retrievable REST revision schema is `2025-01-01`.
+The child resource version is explicitly listed in Microsoft Learn at
+`containerApps/revisions@2026-07-01`. This supports documented version existence,
+not the GET response contract. Revision endpoint/fields are supported by the
+pinned SDK and retrievable official REST schema `2025-07-01`; the exact
+`2026-07-01` GET schema remains unretrieved. The older GET example omits health
+and provisioning states, so live population of those required fields remains
+unqualified.
 The `2026-07-01` revision endpoint, populated defaults (including generated
 probes) and native Functions behavior remain qualification gates. The existing
 template comparison rejects nonempty probes; automatic probe defaults could
@@ -100,4 +105,7 @@ Sources checked on 2026-10-03:
 - [Functions storage](https://learn.microsoft.com/en-us/azure/azure-functions/storage-considerations)
 - [Pinned ARM client source](https://github.com/Azure/azure-sdk-for-go/blob/sdk/azcore/v1.23.0/sdk/azcore/arm/client.go)
 - [Revision lifecycle and scope](https://learn.microsoft.com/en-us/azure/container-apps/revisions)
-- [Official REST revision schema](https://raw.githubusercontent.com/Azure/azure-rest-api-specs/main/specification/app/resource-manager/Microsoft.App/ContainerApps/stable/2025-01-01/ContainerAppsRevisions.json)
+- [Official REST revision schema](https://raw.githubusercontent.com/Azure/azure-rest-api-specs/main/specification/app/resource-manager/Microsoft.App/ContainerApps/stable/2025-07-01/ContainerAppsRevisions.json)
+
+- [Versioned revision resource reference](https://learn.microsoft.com/en-us/azure/templates/microsoft.app/2026-07-01/containerapps/revisions)
+- [Older REST GET example](https://raw.githubusercontent.com/Azure/azure-rest-api-specs/main/specification/app/resource-manager/Microsoft.App/ContainerApps/stable/2025-07-01/examples/Revisions_Get.json)

@@ -236,3 +236,38 @@ handling; suspended/undeclared function and incompatible provider refusal;
 byte/deadline bounds; no invocation payload in persistence/audit; handler error
 separate from transport failure; BFF byte-bound and no-retry checks; real browser
 acceptance under the selected qualified compiler. These are planned, not passed.
+
+## Azure telemetry follow-up
+
+Container Apps ingress `Requests` is platform traffic, not a function invocation
+series. Its status codes cannot establish execution errors or native throttles.
+Keep platform and execution metrics distinct. Version-scoped `FunctionObserver`
+metrics require an existing, verified Application Insights binding: component
+resource ID, exact app role, and a telemetry property identifying the native
+ARM revision. Do not assume `AppVersion` or `AppRoleInstance` has that meaning.
+
+A later read-only logs slice can discover the existing environment logging
+configuration using the pinned managed-environment client. Extract the logging
+destination and workspace/customer identifier only; never read or retain shared
+keys. Query a verified console table profile through the official `azquery`
+LogsClient, with fixed query templates and exact environment/app/revision/workload
+container filters. Console and system logs are not invocation statistics.
+
+Before exposing execution telemetry, extend `FunctionSeries` with provenance,
+estimation/collection quality and unavailable metric reasons. Application Insights
+sampling, host collection filters and ingestion limits can omit executions;
+weighted `ItemCount` values do not establish exact counts. Empty or inaccessible
+query results cannot establish zero activity. No documented equivalent execution
+throttle metric was found; keep it unavailable. Reject partial query results.
+Bound the UTC window, rows, response bytes and request duration. New telemetry
+SDKs need exact compatible pins and stay inside the provider package. Existing
+read permissions and configured telemetry are prerequisites; this task creates
+no telemetry resources, instrumentation credentials, IAM grants or networking.
+
+This design remains queued, with no telemetry SDK installation or cloud calls.
+Sources: [Container Apps metrics](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/supported-metrics/microsoft-app-containerapps-metrics),
+[logging destinations](https://learn.microsoft.com/en-us/azure/container-apps/log-options),
+[Functions telemetry](https://learn.microsoft.com/en-us/azure/azure-functions/analyze-telemetry-data),
+[collection configuration](https://learn.microsoft.com/en-us/azure/azure-functions/configure-monitoring),
+[AppRequests schema](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/tables/apprequests),
+[resource-query permissions](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/api/azure-resource-queries).

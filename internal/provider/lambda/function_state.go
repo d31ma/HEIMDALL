@@ -66,7 +66,7 @@ func (f FunctionState) matchesImage(live *awslambda.GetFunctionOutput, s spec.Se
 }
 
 func (f FunctionState) matchesConfiguration(c *types.FunctionConfiguration, target provider.Target, s spec.Service) bool {
-	if c == nil || c.PackageType != types.PackageTypeImage || aws.ToString(c.Role) != target.Config["execution_role_arn"] || aws.ToInt32(c.Timeout) != f.Timeout(s) || aws.ToInt32(c.MemorySize) != f.Memory(s) || !slices.Equal(c.Architectures, []types.Architecture{f.Architecture(s)}) || c.CapacityProviderConfig != nil || c.DurableConfig != nil {
+	if c == nil || c.PackageType != types.PackageTypeImage || aws.ToString(c.Role) != target.Config[(TargetContract{}).ExecutionRoleKey()] || aws.ToInt32(c.Timeout) != f.Timeout(s) || aws.ToInt32(c.MemorySize) != f.Memory(s) || !slices.Equal(c.Architectures, []types.Architecture{f.Architecture(s)}) || c.CapacityProviderConfig != nil || c.DurableConfig != nil {
 		return false
 	}
 	if c.Environment != nil && c.Environment.Error != nil || c.ImageConfigResponse != nil && c.ImageConfigResponse.Error != nil {

@@ -2,7 +2,6 @@ package lambda
 
 import (
 	"regexp"
-	"sort"
 	"strings"
 
 	"github.com/d31ma/heimdall/internal/provider"
@@ -27,21 +26,8 @@ func (c RuntimeContract) validate() error {
 			return c.reject(service, provider.FeatureFunction, "declare lambda-runtime-api with direct json invocation")
 		}
 	}
-	if c.Target.Region == "" {
-		return (Diagnostic{}).Format("HD0410: Lambda target requires a region")
-	}
-	if !regexp.MustCompile(`^arn:aws(?:-us-gov|-cn)?:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+$`).MatchString(c.Target.Config["execution_role_arn"]) {
-		return (Diagnostic{}).Format("HD0410: Lambda target requires an existing execution_role_arn")
-	}
-	keys := []string{}
-	for key := range c.Target.Config {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	for _, key := range keys {
-		if key != "execution_role_arn" {
-			return (Diagnostic{}).Format("HD0410: Lambda target setting %s is not implemented; network, concurrency and event-source changes need explicit contracts", key)
-		}
+	if err := (TargetContract{Target: c.Target}).Validate(); err != nil {
+		return err
 	}
 	for _, service := range c.Spec.Services {
 		if err := c.serviceError(service); err != nil {

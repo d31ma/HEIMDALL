@@ -59,9 +59,9 @@ func (p publication) existingVersion(ctx context.Context) (string, error) {
 			break
 		}
 		if aws.ToString(listed.NextMarker) == aws.ToString(marker) {
-			return "", (Diagnostic{}).Format("HD0415: Lambda version pagination did not advance")
+			return "", (Diagnostic{}).Format((Diagnostic{}).ReadinessCode(), "Lambda version pagination did not advance")
 		}
 		marker = listed.NextMarker
 	}
-	return "", (Diagnostic{}).Format("HD0415: publication conflicted and no matching immutable version exists")
+	return "", (Diagnostic{}).Format((Diagnostic{}).ReadinessCode(), "publication conflicted and no matching immutable version exists")
 }

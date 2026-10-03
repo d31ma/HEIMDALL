@@ -24,6 +24,7 @@ type protocol struct {
 	mutations           []string
 	failUpdate          bool
 	pendingReads        int
+	requests            int
 	invokeCalls         int
 	invokeFailure       bool
 	handlerFailure      bool
@@ -53,6 +54,7 @@ func (p *protocol) reset() {
 	p.mutations = nil
 	p.failUpdate = false
 	p.pendingReads = 0
+	p.requests = 0
 	p.invokeCalls = 0
 	p.invokeFailure = false
 	p.handlerFailure = false
@@ -71,6 +73,7 @@ func (p *protocol) clone(input map[string]any) map[string]any {
 func (p *protocol) serve(w http.ResponseWriter, r *http.Request) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.requests++
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-Amzn-Requestid", "fixture-request")
 	if strings.HasSuffix(r.URL.Path, "/operation/GetMetricData") {
