@@ -69,6 +69,7 @@ type Service struct {
 	// so editing a cron expression plans as an update — the schedule is
 	// desired state like everything else here.
 	Schedule *Schedule `json:"schedule,omitempty"`
+	Function *Function `json:"function,omitempty"`
 }
 
 // Schedule is x-heimdall-schedule, normalised. An empty Cron is a
@@ -180,6 +181,9 @@ func (d *DeploySpec) Normalize() {
 	sort.Slice(d.Services, func(i, j int) bool { return d.Services[i].Name < d.Services[j].Name })
 	for i := range d.Services {
 		s := &d.Services[i]
+		if s.Function != nil && (d.SchemaVersion == SchemaVersion || d.SchemaVersion == "") {
+			d.SchemaVersion = s.Function.WireVersion()
+		}
 		if s.Replicas == 0 {
 			s.Replicas = 1
 		}
@@ -204,6 +208,9 @@ func (d *DeploySpec) Normalize() {
 // and label values, making the hash depend on an encoder setting.
 func Canonical(d DeploySpec) ([]byte, error) {
 	d.Normalize()
+	if err := (WireSchema{Spec: d}).Validate(); err != nil {
+		return nil, err
+	}
 	var b strings.Builder
 	encoder := json.NewEncoder(&b)
 	encoder.SetEscapeHTML(false)

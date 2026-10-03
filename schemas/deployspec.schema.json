@@ -1,5 +1,5 @@
 {
- "schema_version": "^[0-9]+$",
+ "schema_version": "^(1|2)$",
  "app": "^[a-z][a-z0-9_.-]{0,62}$",
  "revision": "^[0-9a-f]{7,64}$",
  "services": [
@@ -75,6 +75,12 @@
     "monitor_ms?": "^[0-9]+$",
     "parallelism?": "^[0-9]+$",
     "delay_ms?": "^[0-9]+$"
+   },
+   "function?": {
+    "runtime_contract": "^(lambda-runtime-api|azure-functions-v4)$",
+    "invocation": "^(json|http)$",
+    "timeout_ms?": "^[0-9]+$",
+    "architecture?": "^(amd64|arm64)$"
    },
    "schedule?": {
     "cron?": "^[-0-9*/,A-Za-z ]{1,120}$",

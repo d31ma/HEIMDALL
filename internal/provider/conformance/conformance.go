@@ -39,7 +39,9 @@ type Harness struct {
 	// needs beyond the plan — the spec, prune opt-in, and so on.
 	ApplyContext func(ctx context.Context, want spec.DeploySpec) context.Context
 	// Reset removes everything a previous run left behind.
-	Reset func(t *testing.T)
+	Reset               func(t *testing.T)
+	FunctionSupported   func(revision string) spec.DeploySpec
+	InstancesMayBeEmpty bool
 }
 
 // Run executes the suite.
@@ -60,6 +62,65 @@ func Run(t *testing.T, harness Harness) {
 	t.Run("RolloutStrategyConverges", func(t *testing.T) { testRolloutConverges(t, harness) })
 	t.Run("StartFirstRolloutSurvivesAndReportsHealthy", func(t *testing.T) { testStartFirstRollout(t, harness) })
 	t.Run("ScheduledWorkloads", func(t *testing.T) { testScheduled(t, harness) })
+	t.Run("FunctionWorkloads", func(t *testing.T) { testFunctionWorkloads(t, harness) })
+}
+
+func testFunctionWorkloads(t *testing.T, harness Harness) {
+	if harness.Provider.Capabilities().Of(provider.FeatureFunction) != provider.Rejected {
+		testNativeFunctionWorkload(t, harness)
+		return
+	}
+	harness.Reset(t)
+	want := harness.Supported("rev-function")
+	want.Services = want.Services[:1]
+	service := &want.Services[0]
+	service.Ports, service.Healthcheck, service.DependsOn, service.Volumes = nil, nil, nil, nil
+	service.Schedule, service.Update = nil, nil
+	service.Restart, service.Entrypoint, service.Command = "", nil, nil
+	service.Replicas = 1
+	service.Function = &spec.Function{RuntimeContract: "lambda-runtime-api", Invocation: "json", TimeoutMS: 30000, Architecture: "amd64"}
+	want.Normalize()
+	_, err := harness.Provider.Plan(context.Background(), harness.Target, want)
+	var rejection *provider.RejectionError
+	if !errors.As(err, &rejection) {
+		t.Fatalf("function workload requires a capability rejection, got %v", err)
+	}
+	if !strings.Contains(rejection.Error(), service.Name) || !strings.Contains(rejection.Error(), string(provider.FeatureFunction)) {
+		t.Fatalf("rejection must identify the function service: %v", rejection)
+	}
+}
+
+func testNativeFunctionWorkload(t *testing.T, harness Harness) {
+	if harness.FunctionSupported == nil {
+		t.Fatal("a function-aware adapter must supply its actual native runtime contract")
+	}
+	harness.Reset(t)
+	want := harness.FunctionSupported("rev-native-function")
+	if len(want.Services) == 0 || want.Services[0].Function == nil {
+		t.Fatal("native function conformance requires an explicit function declaration")
+	}
+	ctx := context.Background()
+	plan, err := harness.Provider.Plan(ctx, harness.Target, want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := harness.Provider.Apply(harness.ApplyContext(ctx, want), harness.Target, plan); err != nil {
+		t.Fatal(err)
+	}
+	unchanged, err := harness.Provider.Plan(ctx, harness.Target, want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if unchanged.Changes() {
+		t.Fatalf("native function did not converge: %+v", unchanged)
+	}
+	live, err := harness.Provider.Observe(ctx, harness.Target, plan.App)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if live.Revision != want.Revision || live.Rollup() != provider.Healthy {
+		t.Fatalf("native function readiness/revision = %+v", live)
+	}
 }
 
 // testScheduled is the scheduled-workload contract. An adapter that rejects
@@ -297,7 +358,10 @@ func testInstancesCarryRevision(t *testing.T, harness Harness) {
 	if err != nil {
 		t.Fatalf("instances: %v", err)
 	}
-	if len(instances) == 0 {
+	if harness.InstancesMayBeEmpty && harness.Provider.Capabilities().Of(provider.FeatureFunction) == provider.Rejected {
+		t.Fatal("an ordinary container harness cannot waive its instance inventory contract")
+	}
+	if len(instances) == 0 && !harness.InstancesMayBeEmpty {
 		t.Fatal("nothing is running after an apply")
 	}
 	for _, instance := range instances {

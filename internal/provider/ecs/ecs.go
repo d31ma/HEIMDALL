@@ -75,6 +75,7 @@ func (p *Provider) Capabilities() provider.Capabilities {
 	return provider.Capabilities{
 		Provider: "ecs",
 		Support: map[provider.Feature]provider.Support{
+			provider.FeatureFunction:     provider.Rejected,
 			provider.FeatureMultiService: provider.Full,
 			provider.FeatureReplicas:     provider.Full,
 			provider.FeatureResources:    provider.Full,
@@ -104,6 +105,7 @@ func (p *Provider) Capabilities() provider.Capabilities {
 			provider.FeatureScheduled: provider.Full,
 		},
 		Caveats: map[provider.Feature]string{
+			provider.FeatureFunction:    "function images require an explicit native runtime and invocation contract; choose a function-aware target",
 			provider.FeatureFileSecret:  "mount secrets through the task definition is future work; use an environment ${secret:...} reference",
 			provider.FeaturePorts:       "awsvpc networking publishes the container port on the task interface; the host side of a mapping is ignored",
 			provider.FeatureDependsOn:   "ECS orders service creation by wave; task start order belongs to the scheduler",

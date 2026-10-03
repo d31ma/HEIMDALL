@@ -41,20 +41,21 @@ type composeSecret struct {
 }
 
 type composeService struct {
-	Image         string          `yaml:"image"`
-	ContainerName string          `yaml:"container_name"`
-	Entrypoint    stringList      `yaml:"entrypoint"`
-	Command       stringList      `yaml:"command"`
-	Environment   keyValues       `yaml:"environment"`
-	Ports         []string        `yaml:"ports"`
-	Volumes       []string        `yaml:"volumes"`
-	DependsOn     dependencies    `yaml:"depends_on"`
-	Restart       string          `yaml:"restart"`
-	Healthcheck   *healthcheck    `yaml:"healthcheck"`
-	Labels        keyValues       `yaml:"labels"`
-	Deploy        *deploy         `yaml:"deploy"`
-	Secrets       []serviceSecret `yaml:"secrets"`
-	Schedule      *schedule       `yaml:"x-heimdall-schedule"`
+	Image         string               `yaml:"image"`
+	ContainerName string               `yaml:"container_name"`
+	Entrypoint    stringList           `yaml:"entrypoint"`
+	Command       stringList           `yaml:"command"`
+	Environment   keyValues            `yaml:"environment"`
+	Ports         []string             `yaml:"ports"`
+	Volumes       []string             `yaml:"volumes"`
+	DependsOn     dependencies         `yaml:"depends_on"`
+	Restart       string               `yaml:"restart"`
+	Healthcheck   *healthcheck         `yaml:"healthcheck"`
+	Labels        keyValues            `yaml:"labels"`
+	Deploy        *deploy              `yaml:"deploy"`
+	Secrets       []serviceSecret      `yaml:"secrets"`
+	Schedule      *schedule            `yaml:"x-heimdall-schedule"`
+	Function      *functionDeclaration `yaml:"x-heimdall-function"`
 }
 
 // schedule is x-heimdall-schedule. It is a mapping rather than a label
@@ -294,6 +295,9 @@ func (base *composeService) merge(overlay *composeService) {
 	// cron merged with half the base's is nobody's intent.
 	if overlay.Schedule != nil {
 		base.Schedule = overlay.Schedule
+	}
+	if overlay.Function != nil {
+		base.Function = overlay.Function
 	}
 
 	base.Environment = mergeKeyValues(base.Environment, overlay.Environment)

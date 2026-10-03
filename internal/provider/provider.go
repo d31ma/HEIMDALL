@@ -378,6 +378,7 @@ const (
 	FeatureFileSecret   Feature = "file secrets"
 	FeatureStopFirst    Feature = "stop-first updates"
 	FeatureScheduled    Feature = "scheduled workloads"
+	FeatureFunction     Feature = "function workloads"
 )
 
 // Features is every feature in a stable order, so the generated matrix has
@@ -390,6 +391,7 @@ var Features = []Feature{
 	FeatureSecretRef,
 	FeatureStopFirst,
 	FeatureScheduled,
+	FeatureFunction,
 }
 
 // Capabilities is one adapter's answer for every feature.
@@ -467,6 +469,9 @@ func Validate(capabilities Capabilities, want spec.DeploySpec) error {
 	}
 
 	for _, service := range want.Services {
+		if service.Function != nil {
+			reject(service.Name, FeatureFunction, "declares x-heimdall-function "+service.Function.RuntimeContract+" with "+service.Function.Invocation+" invocation")
+		}
 		if len(service.Secrets) > 0 {
 			reject(service.Name, FeatureFileSecret,
 				fmt.Sprintf("mounts %d file secrets", len(service.Secrets)))

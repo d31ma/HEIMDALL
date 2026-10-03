@@ -311,6 +311,9 @@ func convert(name string, service *composeService, variables map[string]string, 
 	if converted.Schedule, err = convertSchedule(service, file, name); err != nil {
 		return spec.Service{}, err
 	}
+	if converted.Function, err = (functionConverter{service: service, file: file, name: name}).Convert(); err != nil {
+		return spec.Service{}, err
+	}
 	return converted, nil
 }
 

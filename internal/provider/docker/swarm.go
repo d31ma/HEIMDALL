@@ -72,6 +72,7 @@ func (s *Swarm) Capabilities() provider.Capabilities {
 	return provider.Capabilities{
 		Provider: "swarm",
 		Support: map[provider.Feature]provider.Support{
+			provider.FeatureFunction:     provider.Rejected,
 			provider.FeatureMultiService: provider.Full,
 			provider.FeaturePorts:        provider.Full,
 			provider.FeatureMultiPort:    provider.Full,
@@ -100,6 +101,7 @@ func (s *Swarm) Capabilities() provider.Capabilities {
 			provider.FeatureScaleToZero: provider.Rejected,
 		},
 		Caveats: map[provider.Feature]string{
+			provider.FeatureFunction:    "function images require an explicit native runtime and invocation contract; choose a function-aware target",
 			provider.FeatureDependsOn:   "Swarm orders service creation by wave; task start order belongs to the scheduler",
 			provider.FeatureBindMount:   "a bind mount names a node-local path, which is a different file on every node; use a named volume",
 			provider.FeatureSidecars:    "one container per Swarm task; declare the sidecar as its own service",

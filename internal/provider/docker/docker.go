@@ -96,6 +96,7 @@ func (p *Provider) Capabilities() provider.Capabilities {
 	return provider.Capabilities{
 		Provider: "docker",
 		Support: map[provider.Feature]provider.Support{
+			provider.FeatureFunction:     provider.Rejected,
 			provider.FeatureMultiService: provider.Full,
 			provider.FeatureSidecars:     provider.Full,
 			provider.FeaturePorts:        provider.Full,
@@ -118,6 +119,7 @@ func (p *Provider) Capabilities() provider.Capabilities {
 			provider.FeatureFileSecret:  provider.Rejected,
 		},
 		Caveats: map[provider.Feature]string{
+			provider.FeatureFunction:    "function images require an explicit native runtime and invocation contract; choose a function-aware target",
 			provider.FeatureReplicas:    "a standalone Engine runs one container per service; use Swarm or a cloud target for replicas",
 			provider.FeatureScaleToZero: "a standalone Engine has no scale-to-zero; use Cloud Run or Container Apps",
 			provider.FeatureFileSecret:  "a standalone Engine has no secrets API; use Swarm, or an environment ${secret:...} reference",

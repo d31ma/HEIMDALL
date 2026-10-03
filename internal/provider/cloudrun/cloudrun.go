@@ -60,6 +60,7 @@ func (p *Provider) Capabilities() provider.Capabilities {
 	return provider.Capabilities{
 		Provider: "cloudrun",
 		Support: map[provider.Feature]provider.Support{
+			provider.FeatureFunction:     provider.Rejected,
 			provider.FeatureMultiService: provider.Full,
 			provider.FeatureSecretRef:    provider.Full,
 			provider.FeatureStopFirst:    provider.Partial,
@@ -72,9 +73,9 @@ func (p *Provider) Capabilities() provider.Capabilities {
 			// above them on demand.
 			provider.FeatureReplicas: provider.Partial,
 			// One serving port per service, chosen by the platform contract.
-			provider.FeaturePorts:     provider.Partial,
-			provider.FeatureMultiPort: provider.Rejected,
-			provider.FeatureDependsOn: provider.Partial,
+			provider.FeaturePorts:       provider.Partial,
+			provider.FeatureMultiPort:   provider.Rejected,
+			provider.FeatureDependsOn:   provider.Partial,
 			provider.FeatureHealthcheck: provider.Rejected,
 			provider.FeatureRestart:     provider.Partial,
 			provider.FeatureNamedVolume: provider.Rejected,
@@ -82,6 +83,7 @@ func (p *Provider) Capabilities() provider.Capabilities {
 			provider.FeatureSidecars:    provider.Rejected,
 		},
 		Caveats: map[provider.Feature]string{
+			provider.FeatureFunction:    "function images require an explicit native runtime and invocation contract; choose a function-aware target",
 			provider.FeatureStopFirst:   "revisions always start the replacement before retiring the old one; order: stop-first behaves as start-first here",
 			provider.FeatureScheduled:   "a scheduled service becomes a Cloud Run job triggered by Cloud Scheduler; the target needs scheduler_service_account for the identity the trigger runs as",
 			provider.FeatureFileSecret:  "Cloud Run secret volumes are future work; use an environment ${secret:...} reference",

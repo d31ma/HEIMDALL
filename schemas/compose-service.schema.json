@@ -20,6 +20,12 @@
   "labels?": {
     "^[^\\s]+$": "^.*$"
   },
+  "x-heimdall-function?": {
+    "runtime_contract": "^(lambda-runtime-api|azure-functions-v4)$",
+    "invocation": "^(json|http)$",
+    "timeout?": "^[0-9]+(ms|s|m|h)$",
+    "architecture?": "^(amd64|arm64)$"
+  },
   "x-heimdall-schedule?": {
     "cron?": "^[-0-9*/,A-Za-z ]{1,120}$",
     "timezone?": "^[A-Za-z][A-Za-z0-9_+/-]{0,63}$",

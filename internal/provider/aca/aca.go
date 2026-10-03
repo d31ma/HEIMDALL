@@ -58,6 +58,7 @@ func (p *Provider) Capabilities() provider.Capabilities {
 	return provider.Capabilities{
 		Provider: "aca",
 		Support: map[provider.Feature]provider.Support{
+			provider.FeatureFunction:     provider.Rejected,
 			provider.FeatureMultiService: provider.Full,
 			provider.FeatureSecretRef:    provider.Full,
 			provider.FeatureStopFirst:    provider.Partial,
@@ -77,6 +78,7 @@ func (p *Provider) Capabilities() provider.Capabilities {
 			provider.FeatureSidecars:    provider.Rejected,
 		},
 		Caveats: map[provider.Feature]string{
+			provider.FeatureFunction:    "function images require an explicit native runtime and invocation contract; choose a function-aware target",
 			provider.FeatureStopFirst:   "revisions always start the replacement before retiring the old one; order: stop-first behaves as start-first here",
 			provider.FeatureScheduled:   "a scheduled service becomes a Container Apps job; ACA evaluates job cron in UTC only, so a schedule naming another timezone is rejected at plan time rather than silently moved",
 			provider.FeatureFileSecret:  "Container Apps secret volumes are future work; use an environment ${secret:...} reference",
