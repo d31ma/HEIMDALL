@@ -46,7 +46,13 @@ invocation, no retries, bounded payloads, secret metadata exclusion, metrics
 units/dimensions and log version isolation. This establishes SDK protocol
 behavior, not native runtime compatibility or account readiness.
 
-Before registration/release: complete publication recovery and ownership
+Follow-up source now includes publication-conflict recovery and ownership
+adversarial cases, native-name collision refusal, and execution class extraction.
+Ownership is rechecked after configuration, before publication and before
+metadata mutation. These follow-up changes have not been executed; the passed
+checkpoint remains `a3421d763932730740cacf31409054cf6176a085`.
+
+Before registration/release: execute publication recovery and ownership
 adversarial tests, the code cohesion review, existing provider/full local
 regression, applicable security gates, generated contracts, invocation/API and
 UI integration, and actual image/runtime qualification. Live cloud qualification

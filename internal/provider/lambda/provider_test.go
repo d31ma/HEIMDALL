@@ -238,6 +238,66 @@ func TestLambdaSecretsNeverReachIdentityTags(t *testing.T) {
 	}
 }
 
+func TestLambdaPublicationConflictReusesOnlyMatchingImmutableVersion(t *testing.T) {
+	h, fake, _, _ := deployed(t)
+	fake.mu.Lock()
+	fake.publicationConflict = true
+	fake.mu.Unlock()
+	want := functionSpec("metadata-change")
+	want.Services[0].Labels = []spec.Label{{Key: "owner", Value: "team"}}
+	ctx := context.Background()
+	plan, err := h.Provider.Plan(ctx, h.Target, want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := h.Provider.Apply(h.ApplyContext(ctx, want), h.Target, plan)
+	if err != nil || len(result.Failures) != 0 {
+		t.Fatalf("unchanged native publication failed recovery: %+v %v", result, err)
+	}
+	unchanged, err := h.Provider.Plan(ctx, h.Target, want)
+	if err != nil || unchanged.Changes() {
+		t.Fatalf("recovered publication did not converge: %+v %v", unchanged, err)
+	}
+}
+
+func TestLambdaPublicationConflictCannotReuseWrongConfiguration(t *testing.T) {
+	h, fake, _, _ := deployed(t)
+	fake.mu.Lock()
+	fake.publicationConflict = true
+	fake.mu.Unlock()
+	want := functionSpec("timeout-change")
+	want.Services[0].Function.TimeoutMS = 60000
+	ctx := context.Background()
+	plan, err := h.Provider.Plan(ctx, h.Target, want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := h.Provider.Apply(h.ApplyContext(ctx, want), h.Target, plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Failures) == 0 {
+		t.Fatal("wrong immutable function configuration was reused after publication conflict")
+	}
+}
+
+func TestLambdaPlanRejectsExistingForeignResourceName(t *testing.T) {
+	h, fake, _, _ := deployed(t)
+	fake.mu.Lock()
+	name := (lambda.Identity{App: provider.AppRef{Project: "conf", App: "events"}, Service: "handler"}).Name()
+	fake.tags[name]["dev.delma.heimdall.managed-by"] = "other-control-plane"
+	before := len(fake.mutations)
+	fake.mu.Unlock()
+	if _, err := h.Provider.Plan(context.Background(), h.Target, functionSpec("initial")); err == nil {
+		t.Fatal("plan promised creation over an existing foreign resource name")
+	}
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	if len(fake.mutations) != before {
+		t.Fatal("ownership refusal mutated native state")
+	}
+}
+
 func TestLambdaFunctionMetricsHaveNativeUnitsAndVersionDimensions(t *testing.T) {
 	h, fake, adapter, plan := deployed(t)
 	ref := provider.FunctionRef{AppRef: plan.App, Service: "handler", Version: "1"}
@@ -275,5 +335,33 @@ func TestLambdaFunctionLogsReadOnlyRequestedNativeVersion(t *testing.T) {
 	streams := fake.logInput["logStreamNames"].([]any)
 	if len(streams) != 1 || streams[0] != "2026/10/03/[1]invocation" {
 		t.Fatalf("wrong native version logs requested: %v", streams)
+	}
+}
+
+func TestLambdaStopsAfterOwnershipChangesDuringUpdate(t *testing.T) {
+	for _, phase := range []string{"configure", "code", "publish"} {
+		t.Run(phase, func(t *testing.T) {
+			h, fake, adapter, _ := deployed(t)
+			want := functionSpec("ownership-race")
+			want.Services[0].Function.TimeoutMS = 60000
+			plan, err := adapter.Plan(context.Background(), h.Target, want)
+			if err != nil {
+				t.Fatal(err)
+			}
+			fake.mu.Lock()
+			fake.ownershipLossAt, fake.mutations = phase, nil
+			fake.mu.Unlock()
+			result, err := adapter.Apply(h.ApplyContext(context.Background(), want), h.Target, plan)
+			if err != nil || !strings.Contains(result.Failures["handler"], "ownership changed") {
+				t.Fatalf("ownership loss was not reported: %+v %v", result, err)
+			}
+			fake.mu.Lock()
+			defer fake.mu.Unlock()
+			for _, mutation := range fake.mutations {
+				if strings.HasPrefix(mutation, "tag:") || strings.Contains(mutation, "second") || phase == "configure" && strings.HasPrefix(mutation, "code:") || phase != "publish" && strings.HasPrefix(mutation, "publish:") {
+					t.Fatalf("mutation crossed ownership-loss boundary: %v", fake.mutations)
+				}
+			}
+		})
 	}
 }

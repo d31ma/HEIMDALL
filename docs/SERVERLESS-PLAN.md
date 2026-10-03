@@ -190,3 +190,49 @@ fake-protocol passes, local image runtime tests, web build and real browser
 results have separate receipts. None implies deployment or provider support
 completion. Full local regression, applicable security gates and reviewed
 operational documentation precede any later release request.
+
+
+## API and web integration queue
+
+Source inspection found the existing `run` endpoint is a scheduled-job command
+with no payload or synchronous result. Function invocation must remain a
+separate route and provider `Invoker` call; it must not change `Runner.RunNow`.
+The existing `app:run` action is the appropriate execution permission candidate,
+with exactly one existing SESAME boundary decision on the application resource.
+Before implementing it, verify the action description and generated contract
+against this broadened workload execution scope; do not add authorization logic.
+
+The planned route is `POST /api/v1/projects/{project}/apps/{app}/services/{service}/invoke`.
+Resolve the application and target from stored identity, reject suspended apps,
+require a declared function in the rendered revision, and fail explicitly when
+the adapter does not implement `Invoker`. Do not let body fields select a target,
+app, service or version. Payload and response are transient; the existing audit
+records path/action/decision metadata, never handler input or output.
+
+The current server has a three-minute write timeout and the BFF defaults to a
+60-second upstream timeout with a configurable ceiling. Lambda allows a longer
+execution timeout. The first synchronous API must therefore document a bounded
+request deadline and an ambiguous timeout outcome: cancellation ends the wait,
+not native work that already started. Do not automatically retry, report a
+transport timeout as a handler failure, or claim cancellation stopped native
+execution. Long-running/asynchronous delivery is a later explicit contract.
+The BFF remains a proxy and preserves its httpOnly session and CA verification.
+
+The existing BFF permits a 1MiB JSON envelope and uses a 32MiB response ceiling.
+The provider permits 6MiB Lambda payloads. The first browser-facing API must use
+an explicit smaller byte limit compatible with the envelope, while preserving
+native limits for direct adapter callers. Source inspection also found that the
+BFF client currently truncates oversized responses rather than rejecting them;
+fix and test that transport behavior before exposing function results.
+
+Function observations need service/version routes using `FunctionObserver`,
+separate from instance CPU/memory routes. The UI should show deployment readiness
+and native invocation counts/errors/throttles/duration units. Empty execution
+inventory must not render as missing or failed deployment. Existing container
+and scheduled-job pages retain their current behavior.
+
+Pending evidence: focused API tests proving one boundary decision and deny/error
+handling; suspended/undeclared function and incompatible provider refusal;
+byte/deadline bounds; no invocation payload in persistence/audit; handler error
+separate from transport failure; BFF byte-bound and no-retry checks; real browser
+acceptance under the selected qualified compiler. These are planned, not passed.

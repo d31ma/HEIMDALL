@@ -14,24 +14,26 @@ import (
 )
 
 type protocol struct {
-	mu                sync.Mutex
-	server            *httptest.Server
-	functions         map[string]map[string]any
-	images            map[string]string
-	tags              map[string]map[string]string
-	versions          map[string]map[string]map[string]any
-	versionImages     map[string]map[string]string
-	mutations         []string
-	failUpdate        bool
-	pendingReads      int
-	invokeCalls       int
-	invokeFailure     bool
-	handlerFailure    bool
-	oversizedResponse bool
-	lastQualifier     string
-	lastInput         []byte
-	metricInput       []byte
-	logInput          map[string]any
+	mu                  sync.Mutex
+	server              *httptest.Server
+	functions           map[string]map[string]any
+	images              map[string]string
+	tags                map[string]map[string]string
+	versions            map[string]map[string]map[string]any
+	versionImages       map[string]map[string]string
+	mutations           []string
+	failUpdate          bool
+	pendingReads        int
+	invokeCalls         int
+	invokeFailure       bool
+	handlerFailure      bool
+	oversizedResponse   bool
+	lastQualifier       string
+	lastInput           []byte
+	metricInput         []byte
+	logInput            map[string]any
+	ownershipLossAt     string
+	publicationConflict bool
 }
 
 func newProtocol(t *testing.T) *protocol {
@@ -55,6 +57,8 @@ func (p *protocol) reset() {
 	p.invokeFailure = false
 	p.handlerFailure = false
 	p.oversizedResponse = false
+	p.ownershipLossAt = ""
+	p.publicationConflict = false
 }
 
 func (p *protocol) clone(input map[string]any) map[string]any {
@@ -176,6 +180,9 @@ func (p *protocol) serve(w http.ResponseWriter, r *http.Request) {
 		if p.failUpdate {
 			config["LastUpdateStatus"] = "Failed"
 		}
+		if p.ownershipLossAt == "configure" {
+			p.tags[name]["dev.delma.heimdall.managed-by"] = "another-authority"
+		}
 		p.mutations = append(p.mutations, "configure:"+name)
 		_ = json.NewEncoder(w).Encode(config)
 		return
@@ -183,16 +190,36 @@ func (p *protocol) serve(w http.ResponseWriter, r *http.Request) {
 	if len(parts) > 1 && parts[1] == "code" {
 		p.images[name] = input["ImageUri"].(string)
 		config["Architectures"] = input["Architectures"]
+		if p.ownershipLossAt == "code" {
+			p.tags[name]["dev.delma.heimdall.managed-by"] = "another-authority"
+		}
 		p.mutations = append(p.mutations, "code:"+name)
 		_ = json.NewEncoder(w).Encode(config)
 		return
 	}
 	if len(parts) > 1 && parts[1] == "versions" {
+		if r.Method == "GET" {
+			versions := []map[string]any{}
+			for _, version := range p.versions[name] {
+				versions = append(versions, version)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"Versions": versions})
+			return
+		}
+		if p.publicationConflict {
+			w.Header().Set("X-Amzn-Errortype", "ResourceConflictException")
+			w.WriteHeader(409)
+			_, _ = w.Write([]byte(`{"message":"unchanged publication"}`))
+			return
+		}
 		version := fmt.Sprint(len(p.versions[name]) + 1)
 		published := p.clone(config)
 		published["Version"] = version
 		p.versions[name][version] = published
 		p.versionImages[name][version] = p.images[name]
+		if p.ownershipLossAt == "publish" {
+			p.tags[name]["dev.delma.heimdall.managed-by"] = "another-authority"
+		}
 		p.mutations = append(p.mutations, "publish:"+name)
 		w.WriteHeader(201)
 		_ = json.NewEncoder(w).Encode(published)

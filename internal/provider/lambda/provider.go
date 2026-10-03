@@ -138,6 +138,11 @@ func (p *Provider) plan(ctx context.Context, target provider.Target, want spec.D
 			return provider.Plan{}, err
 		}
 		kind, reason := provider.OpCreate, "function is not deployed"
+		if _, found := live[s.Name]; !found {
+			if err := p.available(ctx, client, Identity{App: plan.App, Service: s.Name}); err != nil {
+				return provider.Plan{}, err
+			}
+		}
 		if found, ok := live[s.Name]; ok {
 			kind, reason = provider.OpUpdate, "native image, configuration, readiness or desired hash differs"
 			if found.Matches(target, s) && found.Live.Tags["dev.delma.heimdall.service-hash"] == serviceHash {
@@ -158,6 +163,18 @@ func (p *Provider) plan(ctx context.Context, target provider.Target, want spec.D
 		return plan.Operations[i].Service < plan.Operations[j].Service
 	})
 	return plan, nil
+}
+
+func (p *Provider) available(ctx context.Context, client *awslambda.Client, identity Identity) error {
+	_, err := client.GetFunction(ctx, &awslambda.GetFunctionInput{FunctionName: aws.String(identity.Name())})
+	var missing *types.ResourceNotFoundException
+	if errors.As(err, &missing) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return (Diagnostic{}).Format("HD0414: desired function name already exists outside the verified application inventory; inspect ownership and re-plan")
 }
 
 func (p *Provider) functions(ctx context.Context, client *awslambda.Client, app provider.AppRef) (map[string]FunctionState, error) {
@@ -196,10 +213,13 @@ func (p *Provider) functions(ctx context.Context, client *awslambda.Client, app 
 			version := found.Tags["dev.delma.heimdall.function-version"]
 			if number, err := strconv.Atoi(version); err == nil && number > 0 {
 				published, err := client.GetFunction(ctx, &awslambda.GetFunctionInput{FunctionName: entry.FunctionName, Qualifier: aws.String(version)})
-				if err != nil {
+				var missing *types.ResourceNotFoundException
+				if err != nil && !errors.As(err, &missing) {
 					return nil, err
 				}
-				state.Published = published
+				if err == nil {
+					state.Published = published
+				}
 			}
 			result[service] = state
 		}
@@ -248,104 +268,13 @@ func (p *Provider) apply(ctx context.Context, target provider.Target, plan provi
 		if operation.Kind == provider.OpNoop || operation.Prune && !opts.Prune {
 			continue
 		}
-		if err := p.execute(ctx, client, target, plan, opts.Spec, operation); err != nil {
+		if err := (execution{adapter: p, client: client, request: executionRequest{Target: target, Plan: plan, Desired: opts.Spec, Operation: operation}}).Run(ctx); err != nil {
 			result.Failures = map[string]string{operation.Service: err.Error()}
 			return result, nil
 		}
 		result.Applied = append(result.Applied, operation)
 	}
 	return result, nil
-}
-
-func (p *Provider) execute(ctx context.Context, client *awslambda.Client, target provider.Target, plan provider.Plan, want spec.DeploySpec, op provider.Operation) error {
-	id := Identity{App: plan.App, Service: op.Service}
-	existing, err := client.GetFunction(ctx, &awslambda.GetFunctionInput{FunctionName: aws.String(id.Name())})
-	var missing *types.ResourceNotFoundException
-	if err != nil && !errors.As(err, &missing) {
-		return err
-	}
-	if err == nil && (existing.TagsError != nil || !id.Owns(existing.Tags)) {
-		return (Diagnostic{}).Format("HD0414: resource name is owned outside this HEIMDALL application")
-	}
-	if op.Kind == provider.OpDelete {
-		if missing != nil {
-			return nil
-		}
-		_, err = client.DeleteFunction(ctx, &awslambda.DeleteFunctionInput{FunctionName: aws.String(id.Name())})
-		if err != nil {
-			return err
-		}
-		return p.waitDeleted(ctx, client, id.Name())
-	}
-	if op.Kind != provider.OpCreate && op.Kind != provider.OpUpdate {
-		return (Diagnostic{}).Format("HD0414: unsupported Lambda operation %s", op.Kind)
-	}
-	s, ok := want.Service(op.Service)
-	if !ok {
-		return (Diagnostic{}).Format("HD0414: operation names a function absent from desired state")
-	}
-	env, err := p.environment(ctx, s)
-	if err != nil {
-		return err
-	}
-	sizing := FunctionState{}
-	imageConfig := &types.ImageConfig{EntryPoint: s.Entrypoint, Command: s.Command, WorkingDirectory: aws.String("")}
-	if missing != nil {
-		tags, err := id.Tags(plan, s, "")
-		if err != nil {
-			return err
-		}
-		_, err = client.CreateFunction(ctx, &awslambda.CreateFunctionInput{FunctionName: aws.String(id.Name()), PackageType: types.PackageTypeImage, Code: &types.FunctionCode{ImageUri: aws.String(s.Image)}, Role: aws.String(target.Config["execution_role_arn"]), Timeout: aws.Int32(sizing.Timeout(s)), MemorySize: aws.Int32(sizing.Memory(s)), Architectures: []types.Architecture{sizing.Architecture(s)}, Environment: env, ImageConfig: imageConfig, Tags: tags})
-		if err != nil {
-			return err
-		}
-	} else {
-		if existing.Configuration == nil || existing.Configuration.CapacityProviderConfig != nil || existing.Configuration.DurableConfig != nil {
-			return (Diagnostic{}).Format("HD0414: default Lambda cannot update a managed-instance or durable function")
-		}
-		_, err = client.UpdateFunctionConfiguration(ctx, &awslambda.UpdateFunctionConfigurationInput{FunctionName: aws.String(id.Name()), RevisionId: existing.Configuration.RevisionId, Role: aws.String(target.Config["execution_role_arn"]), Timeout: aws.Int32(sizing.Timeout(s)), MemorySize: aws.Int32(sizing.Memory(s)), Environment: env, ImageConfig: imageConfig})
-		if err != nil {
-			return err
-		}
-		configured, err := p.waitReady(ctx, client, id.Name(), "")
-		if err != nil {
-			return err
-		}
-		_, err = client.UpdateFunctionCode(ctx, &awslambda.UpdateFunctionCodeInput{FunctionName: aws.String(id.Name()), RevisionId: configured.Configuration.RevisionId, ImageUri: aws.String(s.Image), Architectures: []types.Architecture{sizing.Architecture(s)}})
-		if err != nil {
-			return err
-		}
-	}
-	ready, err := p.waitReady(ctx, client, id.Name(), "")
-	if err != nil {
-		return err
-	}
-	if !(FunctionState{}).matchesImage(ready, s) || !(FunctionState{}).matchesConfiguration(ready.Configuration, target, s) {
-		return (Diagnostic{}).Format("HD0415: native Lambda code/configuration did not converge")
-	}
-	version, err := (publication{client: client, identity: id, ready: ready, target: target, service: s}).Version(ctx)
-	if err != nil {
-		return err
-	}
-	if number, err := strconv.Atoi(version); err != nil || number < 1 {
-		return (Diagnostic{}).Format("HD0415: Lambda did not return an immutable published version")
-	}
-	immutable, err := p.waitReady(ctx, client, id.Name(), version)
-	if err != nil {
-		return err
-	}
-	if !(FunctionState{Live: ready, Published: immutable}).Matches(target, s) {
-		return (Diagnostic{}).Format("HD0415: published Lambda configuration did not converge")
-	}
-	tags, err := id.Tags(plan, s, version)
-	if err != nil {
-		return err
-	}
-	_, err = client.TagResource(ctx, &awslambda.TagResourceInput{Resource: ready.Configuration.FunctionArn, Tags: tags})
-	if err != nil {
-		return err
-	}
-	return p.waitMetadata(ctx, client, id, tags)
 }
 
 func (p *Provider) waitMetadata(ctx context.Context, client *awslambda.Client, id Identity, tags map[string]string) error {
