@@ -33,7 +33,7 @@ func harness(t *testing.T) (conformance.Harness, *protocol, *lambda.Provider) {
 		want.Services[0].Ports = []spec.Port{{Target: 80, Published: 80, Protocol: "tcp"}}
 		return want
 	}, ApplyContext: func(ctx context.Context, want spec.DeploySpec) context.Context {
-		return lambda.WithApply(ctx, lambda.ApplyOptions{Spec: want, Prune: true})
+		return (lambda.ApplyOptions{Spec: want, Prune: true}).WithContext(ctx)
 	}, Reset: func(*testing.T) { fake.mu.Lock(); defer fake.mu.Unlock(); fake.reset() }}
 	return h, fake, adapter
 }

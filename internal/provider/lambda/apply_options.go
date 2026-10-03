@@ -10,6 +10,6 @@ type ApplyOptions struct {
 	Prune bool
 }
 
-func (o ApplyOptions) Context(ctx context.Context) context.Context {
+func (o ApplyOptions) WithContext(ctx context.Context) context.Context {
 	return context.WithValue(ctx, applyKey{}, o)
 }

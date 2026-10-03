@@ -241,7 +241,7 @@ func (p *Provider) Apply(ctx context.Context, target provider.Target, plan provi
 func (p *Provider) apply(ctx context.Context, target provider.Target, plan provider.Plan) (provider.Result, error) {
 	opts, ok := ctx.Value(applyKey{}).(ApplyOptions)
 	if !ok {
-		return provider.Result{}, (Diagnostic{}).Format("HD0413: Lambda apply requires WithApply options")
+		return provider.Result{}, (Diagnostic{}).Format("HD0413: Lambda apply requires ApplyOptions.WithContext")
 	}
 	hash, err := spec.Hash(opts.Spec)
 	if err != nil {
