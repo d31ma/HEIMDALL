@@ -22,7 +22,6 @@ env:
   # Pinned like the pair above — and CHEX's install.sh treats its version
   # env verbatim, so "latest" builds a vlatest URL and 404s.
   CHEX_VERSION: v26.32.02
-  TACHYON_VERSION: v26.33.02
   TTID_VERSION: v26.32.03
   # sops and age back the sops/ secret scheme end-to-end tests, installed
   # through the Go module proxy so the checksum database pins them.
@@ -46,11 +45,12 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version-file: app/server/go.mod
+          cache-dependency-path: app/server/go.sum
           cache: true
 
-      - name: Install FYLO, SESAME, CHEX, and ty
-        run: scripts/install-deps.sh
+      - name: Install FYLO, SESAME, CHEX, and TTID
+        run: scripts/install-deps.sh --control-plane
 
       - name: Install sops and age for the secret-scheme tests
         # Without these the SOPS end-to-end tests skip silently, and a CI
@@ -62,13 +62,13 @@ jobs:
 
       - name: Check formatting
         run: |
-          unformatted=$(gofmt -l cmd internal)
+          unformatted=$(gofmt -l app/server tests/server)
           if [ -n "$unformatted" ]; then
             echo "gofmt needed on:"; echo "$unformatted"; exit 1
           fi
 
       - name: Vet
-        run: go vet ./...
+        run: scripts/native-go.sh vet
 
       - name: Test with a coverage floor
         # -coverpkg makes coverage cross-package, so a handler exercised only
@@ -76,8 +76,8 @@ jobs:
         # measured 63.5% when set, floored at 60 — raise it when it rises,
         # never lower it to make a build pass.
         run: |
-          go test -count=1 -coverprofile=coverage.out -coverpkg=./internal/... ./...
-          total=$(go tool cover -func=coverage.out | tail -1 | grep -oE '[0-9.]+' | tail -1)
+          scripts/native-go.sh test -count=1 -coverprofile="$GITHUB_WORKSPACE/coverage.out" -coverpkg="$(scripts/native-go.sh packages | paste -sd, -)"
+          total=$(go -C app/server tool cover -func="$GITHUB_WORKSPACE/coverage.out" | tail -1 | grep -oE '[0-9.]+' | tail -1)
           echo "coverage: ${total}%"
           awk -v t="$total" 'BEGIN { exit (t >= 60.0) ? 0 : 1 }' || {
             echo "coverage ${total}% is below the 60% floor" >&2
@@ -89,7 +89,7 @@ jobs:
         # locally and wrong here: CI exists to run them. A skip on the
         # runner means the install step regressed.
         run: |
-          output=$(go test -count=1 ./internal/store/ ./internal/auth/ ./internal/reconcile/ ./internal/registry/ -v 2>&1 | grep -c "SKIP" || true)
+          output=$(scripts/native-go.sh test-packages -count=1 -v ./repositories/store/ ./services/auth/ ./services/reconcile/ ./services/registry/ 2>&1 | grep -c "SKIP" || true)
           if [ "$output" -gt 0 ]; then
             echo "$output test(s) skipped; a required binary is missing from PATH" >&2
             exit 1
@@ -97,7 +97,7 @@ jobs:
 
       - name: Verify heimdall version ships
         run: |
-          go build -ldflags "-X main.version=$(cat VERSION)" -o heimdall ./cmd/heimdall
+          go -C app/server build -ldflags "-X main.version=$(cat VERSION)" -o "$GITHUB_WORKSPACE/heimdall" ./commands/heimdall
           ./heimdall version
           test "$(./heimdall version)" = "heimdall $(cat VERSION)"
 
@@ -113,75 +113,48 @@ jobs:
         run: scripts/ci-gates.sh
 
   web:
-    name: Web tier
+    name: Qualified web, gateway, and website gates
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 45
+    env:
+      # Configure only after a native Linux/amd64 checkpoint >=29 is qualified
+      # (including an explicitly scoped qualification with its base provenance).
+      # Pin the manifest independently; its artifact hash and source are verified
+      # before ty executes. A macOS artifact or an old release tag is insufficient.
+      HD_TACHYON_BINARY_URL: ${{ vars.TACHYON_LINUX_AMD64_BINARY_URL }}
+      HD_TACHYON_MANIFEST_URL: ${{ vars.TACHYON_LINUX_AMD64_MANIFEST_URL }}
+      HD_TACHYON_MANIFEST_SHA256: ${{ vars.TACHYON_LINUX_AMD64_MANIFEST_SHA256 }}
+      GOTOOLCHAIN: local
+      GOMAXPROCS: '2'
     steps:
       - name: Check out source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Set up Node
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: '22'
-
-      # A syntax error in a Tac page or a Yon handler is otherwise found by a
-      # human opening the page, which is the slowest possible feedback loop.
-      - name: Check the JavaScript parses
+      - name: Require the native Linux qualification handoff
+        shell: bash
         run: |
-          for file in $(find web website -name '*.js' -not -path '*/dist/*' -not -path '*/node_modules/*'); do
-            node --check "$file"
-          done
-
-      - name: Run the gateway tests
-        # node:test, stdlib — no install step, which is the point.
-        run: cd web && npm test
-
-      - name: Type-check the JSDoc
-        # JSDoc is this tier's type system — no build step, no .ts files — so
-        # it is only worth writing if something reads it. checkJs turns the
-        # annotations into a gate: it has already caught a page reading the
-        # wrong level of an API answer, which no test noticed because the
-        # feature simply never appeared.
-        run: |
-          cd web && npm ci && npm run typecheck && cd ..
-          cd website && npm run typecheck && cd ..
-
-      - name: Check the committed Tailwind sheets are fresh
-        # tailwind.css is generated from tailwind.src.css and committed —
-        # static serving, no build step at runtime. A stale sheet means
-        # someone edited markup without running `npm run css`.
-        run: |
-          cd web && npm ci && npm run css && cd ..
-          cd website && npm run css && cd ..
-          if ! git diff --exit-code -- web/client/shared/styles/tailwind.css website/client/shared/styles/tailwind.css; then
-            echo "the committed tailwind.css is stale; run npm run css in web/ and website/" >&2
+          export HD_TACHYON_BIN="$RUNNER_TEMP/heimdall-qualified-input/ty"
+          export HD_TACHYON_MANIFEST="$RUNNER_TEMP/heimdall-qualified-input/manifest.json"
+          export DEPS_BIN="$RUNNER_TEMP/heimdall-deps/bin"
+          printf '%s\n' "HD_TACHYON_BIN=$HD_TACHYON_BIN" "HD_TACHYON_MANIFEST=$HD_TACHYON_MANIFEST" "DEPS_BIN=$DEPS_BIN" "HD_TEST_COMPILER=$DEPS_BIN/ty" "HD_E2E_TACHYON_BIN=$DEPS_BIN/ty" "HD_E2E_COMPILER_MANIFEST=$HD_TACHYON_MANIFEST" "HD_E2E_WORK_ROOT=$RUNNER_TEMP" "HD_E2E_EVIDENCE_DIR=$RUNNER_TEMP/heimdall-e2e-evidence" >> "$GITHUB_ENV"
+          if [ -z "$HD_TACHYON_BINARY_URL" ] || [ -z "$HD_TACHYON_MANIFEST_URL" ] || [ -z "$HD_TACHYON_MANIFEST_SHA256" ]; then
+            echo 'Blocked: no qualified Linux/amd64 Tachyon checkpoint >=29 handoff. Configure TACHYON_LINUX_AMD64_BINARY_URL, TACHYON_LINUX_AMD64_MANIFEST_URL, and TACHYON_LINUX_AMD64_MANIFEST_SHA256 after qualification.' >&2
             exit 1
           fi
+          case "$HD_TACHYON_BINARY_URL" in https://*) ;; *) echo 'Compiler URL must use HTTPS.' >&2; exit 1;; esac
+          case "$HD_TACHYON_MANIFEST_URL" in https://*) ;; *) echo 'Manifest URL must use HTTPS.' >&2; exit 1;; esac
+          [[ "$HD_TACHYON_MANIFEST_SHA256" =~ ^[0-9a-f]{64}$ ]] || { echo 'Pin the exact manifest SHA256.' >&2; exit 1; }
+          mkdir -p "$(dirname "$HD_TACHYON_BIN")"
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --max-time 60 "$HD_TACHYON_MANIFEST_URL" -o "$HD_TACHYON_MANIFEST"
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --max-time 180 "$HD_TACHYON_BINARY_URL" -o "$HD_TACHYON_BIN"
+          scripts/install-deps.sh --tachyon
 
-      - name: Check the vendored asset is not committed
-        # DuVay is vendored by script rather than committed, so a stray copy
-        # means someone bypassed scripts/vendor-duvay.sh.
-        run: |
-          for dir in web/client/shared/assets/duvay website/client/shared/assets/duvay; do
-            if [ -n "$(git ls-files "$dir")" ]; then
-              echo "$dir is committed; it should be vendored by script" >&2
-              exit 1
-            fi
-          done
-
-  e2e-web:
-    name: Web end-to-end
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - name: Check out source
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Set up Go
+      - name: Set up the Yon Go toolchain
+        # The control-plane matrix still follows go.mod. Yon requires local
+        # Go >=1.27; its assembler deliberately disables automatic downloads.
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: '1.27'
           cache: true
 
       - name: Set up Node
@@ -189,60 +162,105 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install FYLO, SESAME, CHEX, and ty
-        run: scripts/install-deps.sh
+      - name: Install the pinned control-plane dependencies
+        run: scripts/install-deps.sh --control-plane
 
-      - name: Install Playwright
+      - name: Install locked web tools and browser
         run: |
-          cd web
-          npm ci
-          ./node_modules/.bin/playwright install --with-deps chromium-headless-shell
+          npm ci --prefix app
+          # The website intentionally shares the exact web lockfile/tools.
+          # This link is created only in the disposable CI checkout.
+          ln -s "$GITHUB_WORKSPACE/app/node_modules" website/node_modules
+          "$GITHUB_WORKSPACE/app/node_modules/.bin/playwright" install --with-deps chromium-headless-shell
 
-      - name: Vendor DuVay and run the suite
-        # The e2e drives a real control plane, real SESAME, real ty serve,
-        # and a real browser. It is the only place the whole stack meets.
+      - name: Check plain JavaScript tests and configuration
+        # Authored @Service/@OnStart JavaScript is compiler input. The qualified
+        # bundle below parses it; Node's parser does not understand decorators.
         run: |
-          scripts/vendor-duvay.sh
-          scripts/e2e-web.sh
-
-  website:
-    name: Website
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Check out source
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Set up Node
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: '22'
-
-      - name: Install ty
-        run: scripts/install-deps.sh
-
-      - name: Install Playwright
-        run: |
-          cd web
-          npm ci
-          ./node_modules/.bin/playwright install --with-deps chromium-headless-shell
+          find tests/app -type f -name '*.js' -print0 | while IFS= read -r -d '' file; do node --check "$file"; done
+          node --check app/playwright.config.js
 
       - name: Vendor DuVay
-        # The audits gate the real stylesheet; the script fetches the hosted
-        # sheet when no local checkout exists, so this is a hard step.
         run: scripts/vendor-duvay.sh
 
-      - name: Serve the website and run its suite
-        # The docs are a product surface with a committed test: entities
-        # decoded, sidebar marking, zero overflow at phone width — the
-        # audits that found real defects, kept as gates.
+      - name: Compile the app and website with the qualified compiler
+        # These bundles also create the global model declarations consumed by
+        # checkJs. All generated files remain in the disposable CI checkout.
         run: |
-          (cd website && ty serve --port 9304 --no-watch &)
-          for i in $(seq 1 30); do
-            curl -sf http://127.0.0.1:9304/ >/dev/null && break
-            sleep 1
+          ty bundle "$GITHUB_WORKSPACE/app" --out-dir dist --no-incremental
+          ty bundle "$GITHUB_WORKSPACE/website" --out-dir dist --no-incremental
+
+      - name: Run the actual Yon gateway tests
+        # These tests compile and serve the Go BFF with HD_TEST_COMPILER.
+        run: npm test --prefix app
+
+      - name: Type-check both clients
+        run: |
+          npm run typecheck --prefix app
+          npm run typecheck --prefix appsite
+
+      - name: Check the committed Tailwind sheets are fresh
+        run: |
+          npm run css --prefix app
+          npm run css --prefix appsite
+          if ! git diff --exit-code -- app/client/shared/styles/tailwind.css website/client/shared/styles/tailwind.css; then
+            echo 'The committed Tailwind sheets are stale; regenerate both with the locked web dependencies.' >&2
+            exit 1
+          fi
+
+      - name: Check the vendored asset is not committed
+        run: |
+          for dir in app/client/shared/assets/duvay website/client/shared/assets/duvay; do
+            if [ -n "$(git ls-files "$dir")" ]; then
+              echo "$dir is committed; it should be vendored by script" >&2
+              exit 1
+            fi
           done
-          cd web && SITE_URL=http://127.0.0.1:9304 ./node_modules/.bin/playwright test site
+
+      - name: Run isolated web end-to-end fixtures
+        env:
+          HD_E2E_NODE_MODULES: ${{ github.workspace }}/app/node_modules
+        run: scripts/e2e-web.sh
+
+      - name: Serve the compiled website and run its suite
+        shell: bash
+        run: |
+          python3 - <<'PY_SITE'
+          import os,pathlib,signal,socket,subprocess,time,urllib.error,urllib.request
+          root=pathlib.Path(os.environ['GITHUB_WORKSPACE'])
+          with socket.socket() as reservation:
+              reservation.bind(('127.0.0.1',0));port=reservation.getsockname()[1]
+          url='http://127.0.0.1:'+str(port)
+          def stop_owned(process):
+              try:os.killpg(process.pid,signal.SIGCONT);os.killpg(process.pid,signal.SIGTERM)
+              except ProcessLookupError:pass
+              try:process.wait(timeout=5)
+              except subprocess.TimeoutExpired:
+                  try:os.killpg(process.pid,signal.SIGKILL)
+                  except ProcessLookupError:pass
+                  process.wait()
+          def interrupted(_signal,_frame):raise SystemExit(143)
+          signal.signal(signal.SIGTERM,interrupted)
+          signal.signal(signal.SIGINT,interrupted)
+          log=pathlib.Path(os.environ['RUNNER_TEMP'])/'heimdall-website.log'
+          with log.open('wb') as output:
+              process=subprocess.Popen([os.environ['HD_TEST_COMPILER'],'serve',str(root/'website'),'--host','127.0.0.1','--port',str(port),'--out-dir','dist','--no-bundle','--no-watch','--no-self-restart'],cwd=root/'website',stdout=output,stderr=subprocess.STDOUT,start_new_session=True)
+              try:
+                  ready=False
+                  for _ in range(30):
+                      if process.poll() is not None:raise SystemExit('Owned website runtime exited before readiness; see '+str(log))
+                      try:
+                          with urllib.request.urlopen(url,timeout=1) as response:ready=response.status==200
+                      except (OSError,urllib.error.URLError):pass
+                      if ready:break
+                      time.sleep(1)
+                  if not ready:raise SystemExit('Owned website runtime did not become ready; see '+str(log))
+                  environment=os.environ.copy();environment['SITE_URL']=url
+                  browser=subprocess.Popen([str(root/'app/node_modules/.bin/playwright'),'test',r'site\.spec\.js$','--workers','1','--retries','0'],cwd=root/'app',env=environment,start_new_session=True)
+                  try:raise SystemExit(browser.wait(timeout=360))
+                  finally:stop_owned(browser)
+              finally:stop_owned(process)
+          PY_SITE
 
   lint:
     name: Lint
@@ -255,7 +273,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version-file: app/server/go.mod
+          cache-dependency-path: app/server/go.sum
 
       - name: golangci-lint
         # v8 installs the v2 line; v6's v1 binaries are built with go1.24
@@ -263,6 +282,8 @@ jobs:
         uses: golangci/golangci-lint-action@v8
         with:
           version: latest
+          working-directory: app/server
+          args: --config ../../.golangci.yml ./commands/... ./services/api/... ./helpers/git/... ./helpers/schema/... ./helpers/secrets/... ./utils/... ./models/spec/... ./repositories/... ./services/agent/... ./services/auth/... ./services/dispatch/... ./services/enroll/... ./services/observe/... ./services/provider/... ./services/reconcile/... ./services/registry/... ./services/render/...
 
   vulnerabilities:
     name: govulncheck
@@ -275,12 +296,14 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version-file: app/server/go.mod
+          cache-dependency-path: app/server/go.sum
 
       - name: Scan for known vulnerabilities
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
-          govulncheck ./...
+          cd app/server
+          govulncheck ./commands/... ./services/api/... ./helpers/git/... ./helpers/schema/... ./helpers/secrets/... ./utils/... ./models/spec/... ./repositories/... ./services/agent/... ./services/auth/... ./services/dispatch/... ./services/enroll/... ./services/observe/... ./services/provider/... ./services/reconcile/... ./services/registry/... ./services/render/...
 
   licenses:
     name: License scan
@@ -293,12 +316,14 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version-file: app/server/go.mod
+          cache-dependency-path: app/server/go.sum
 
       - name: Check dependency licences
         # Apache-2.0 is HEIMDALL's own licence; the allowlist is the set
         # compatible with redistributing a single binary under it.
         run: |
           go install github.com/google/go-licenses@latest
-          go-licenses check ./... \
+          cd app/server
+          go-licenses check ./commands/... ./services/api/... ./helpers/git/... ./helpers/schema/... ./helpers/secrets/... ./utils/... ./models/spec/... ./repositories/... ./services/agent/... ./services/auth/... ./services/dispatch/... ./services/enroll/... ./services/observe/... ./services/provider/... ./services/reconcile/... ./services/registry/... ./services/render/... \
             --allowed_licenses=Apache-2.0,MIT,BSD-2-Clause,BSD-3-Clause,ISC

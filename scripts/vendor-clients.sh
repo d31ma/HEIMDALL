@@ -21,9 +21,9 @@ copy() {
   echo "vendored $1 -> $to"
 }
 
-copy FYLO/clients/go/fylo.go internal/store/fylo/fylo.go
-copy CHEX/clients/go/chex.go internal/schema/chex/chex.go
+copy FYLO/clients/go/fylo.go app/server/repositories/store/fylo/fylo.go
+copy CHEX/clients/go/chex.go app/server/helpers/schema/chex/chex.go
 
-gofmt -l internal/store/fylo internal/schema/chex
-go build ./...
+gofmt -l app/server/repositories/store/fylo app/server/helpers/schema/chex
+scripts/native-go.sh build
 echo "vendored clients refreshed; commit them with the upstream version in the message"

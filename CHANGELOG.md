@@ -3,6 +3,9 @@
 All notable changes to HEIMDALL are recorded here. Versions are CalVer,
 `YY.WW.DD`, derived in UTC.
 
+Package references in historical entries use the current `app/server/` layout;
+the recorded results retain their original source and validation scope.
+
 ## [Unreleased]
 
 ### Fixed
@@ -46,7 +49,7 @@ All notable changes to HEIMDALL are recorded here. Versions are CalVer,
   ten runs per job and prunes the rest, so the Engine's own record is the
   execution history.
 
-- `internal/cron` parses the five-field POSIX expression and answers "when
+- `app/server/utils/cron` parses the five-field POSIX expression and answers "when
   next, in this timezone". Six-field expressions are refused rather than
   translated: seconds-first means something different on AWS and Quartz, and
   guessing is how a nightly job runs every minute.
@@ -205,7 +208,7 @@ All notable changes to HEIMDALL are recorded here. Versions are CalVer,
   Activity pulls older pages by cursor when you reach the last one, so the
   table walks the whole history rather than the first slice; Runs pages the
   executions the runtime kept. Both share one pager in
-  `web/client/shared/scripts/pager.js`.
+  `app/client/shared/scripts/pager.js`.
 
 - **The instance page took Docker Desktop's shape.** Identity, status, and a
   tab strip — Metrics, Logs, Runs, Inspect, Events — with the log tail now a
@@ -404,7 +407,7 @@ migration introduced; all eight UI tests pass again.
   the corneal glint is a tiny dashboard with a metrics sparkline, the live
   series glows green in the pupil where reflection is strongest, and log
   lines shimmer across the lower iris
-  (`web/client/shared/assets/heimdall-mark.svg`). It sits
+  (`app/client/shared/assets/heimdall-mark.svg`). It sits
   in every page header and is the favicon; Tac owns the `<head>`, so the
   icon link is injected by the shared `api.js` module every page already
   imports. Fixed brand colours by design — a mark keeps its identity across
@@ -489,7 +492,7 @@ migration introduced; all eight UI tests pass again.
   job serving `website/` with ty and running its committed audit suite; and
   a Tailwind freshness check (the committed sheets must match a rebuild).
 - Housekeeping the workflow surfaced: `install-deps.sh` now fetches ty
-  (TACHYON) too; `vendor-duvay.sh` feeds both `web/` and `website/` and
+  (TACHYON) too; `vendor-duvay.sh` feeds both `app/` and `website/` and
   both copies are gitignored with a CI check; `e2e-web.sh` runs only its
   own harness-compatible suite by default, while the demo-stack specs
   (views, fullpath) mark themselves CI-skipped as the developer tools they
@@ -825,7 +828,7 @@ failover. See docs/PHASE_*_EVIDENCE.md for what is proven and how.
   application that does not live on the certificate's target, so an agent
   cannot write history into another host's charts.
 
-- Observability v1 for direct Docker targets. `internal/observe` is the
+- Observability v1 for direct Docker targets. `app/server/services/observe` is the
   scrape → ring buffer → minute-rollup pipeline: fifteen-second samples, an
   hour of raw points per instance in memory, a day of minute rollups in
   `hd-rollups` (average and max both — a chart drawn from averages alone
@@ -877,7 +880,7 @@ failover. See docs/PHASE_*_EVIDENCE.md for what is proven and how.
   supply-chain surface. The tag must match `VERSION` or the release refuses.
 - Coverage floor in CI: 60%, cross-package (`-coverpkg`), measured 63.5% when
   set. A ratchet — raise it when it rises, never lower it to pass.
-- Gateway allowlist tests: 17 `node:test` cases in `web/tests/`, each
+- Gateway allowlist tests: 17 `node:test` cases in `tests/app/`, each
   asserting a refused request never left the process.
 - Playwright end-to-end (`scripts/e2e-web.sh`): five tests driving the real
   stack — control plane, SESAME, ty serve, browser. Login refusal stays
@@ -885,7 +888,7 @@ failover. See docs/PHASE_*_EVIDENCE.md for what is proven and how.
   reload after logout shows the form, not a cached list), a dry run always
   reports an outcome, and DuVay theming is wired.
 
-- Auto-sync and self-heal (`internal/reconcile/auto.go`). One loop, not two:
+- Auto-sync and self-heal (`app/server/services/reconcile/auto.go`). One loop, not two:
   `Status` refreshes from git and reads live state, so a new commit and a
   container killed by hand arrive as the same OutOfSync observation. The two
   policy flags only decide which of them an application consented to. A
@@ -907,30 +910,30 @@ failover. See docs/PHASE_*_EVIDENCE.md for what is proven and how.
 
 ### Added — Phase 1 vertical slice (Docker Engine)
 
-- `internal/render`: compose → `DeploySpec`. Overlays follow Compose's own
+- `app/server/services/render`: compose → `DeploySpec`. Overlays follow Compose's own
   merge rules, interpolation is single-pass and never consults the host
   environment, and `${secret:...}` is rewritten to a reference that is only
   resolved at apply time. An unmodelled directive fails by name and line.
-- `internal/git`: bare mirror, ref resolution, file reads at a commit,
+- `app/server/helpers/git`: bare mirror, ref resolution, file reads at a commit,
   optional signature verification. Paths and refs are validated before they
   reach argv, so a repository document cannot smuggle in a git flag.
-- `internal/provider`: the adapter interface, `Capabilities`, plan-time
+- `app/server/services/provider`: the adapter interface, `Capabilities`, plan-time
   `Validate` that reports every rejection at once, and resource-tier snapping
   that never snaps downward.
-- `internal/provider/docker`: the Docker Engine adapter, over the Engine API
+- `app/server/services/provider/docker`: the Docker Engine adapter, over the Engine API
   with stdlib `net/http` and no Docker SDK.
-- `internal/provider/conformance`: the suite every adapter must pass, written
+- `app/server/services/provider/conformance`: the suite every adapter must pass, written
   before the second adapter as planned.
-- `internal/diff`: field-level spec diff with secret references shown as
+- `app/server/utils/diff`: field-level spec diff with secret references shown as
   references, sync status, and health rollup.
-- `internal/reconcile`: refresh, status, sync, dry run, rollback, selective
+- `app/server/services/reconcile`: refresh, status, sync, dry run, rollback, selective
   sync — each recorded in one `hd-operations` document.
-- `internal/enroll`: fingerprint-pinned enrollment tokens, the agent CA, and
+- `app/server/services/enroll`: fingerprint-pinned enrollment tokens, the agent CA, and
   the control plane's own TLS certificate.
-- `internal/dispatch`: the rendezvous for outbound-only agents, and `Remote`,
+- `app/server/services/dispatch`: the rendezvous for outbound-only agents, and `Remote`,
   which makes an agent-managed target a `provider.Provider` so the reconciler
   has one code path rather than two.
-- `internal/agent` and `heimdall agent`: the host process. Enrols over a
+- `app/server/services/agent` and `heimdall agent`: the host process. Enrols over a
   pinned connection, long-polls for work over mTLS, runs the same Docker
   adapter the control plane would have, and reports back. It opens no port.
 - `heimdall enroll`, an authorized route that mints an enrollment token.
@@ -941,7 +944,7 @@ failover. See docs/PHASE_*_EVIDENCE.md for what is proven and how.
 - `heimdall login`, `app`, `diff`, and `sync`; local login with Argon2id and
   TOTP, entirely through SESAME.
 - `scripts/e2e-docker.sh`, the live-Engine gate.
-- `web/`: the Tachyon web tier. Two Tac pages — the application list, and an
+- `app/`: the Tachyon web tier. Two Tac pages — the application list, and an
   application's status, desired-versus-live diff, sync, dry run, rollback, and
   history — over two Yon routes that attach a session and forward. The session
   lives in an httpOnly cookie, so an injected script cannot read a credential
@@ -988,17 +991,17 @@ failover. See docs/PHASE_*_EVIDENCE.md for what is proven and how.
 - `spec.DeploySpec`: the provider-neutral canonical model, with deterministic
   canonical JSON and SHA-256 content addressing. The fixture hash is pinned by
   test, so a struct edit that changes every stored revision fails the build.
-- `internal/schema`: CHEX validation of compose input and `DeploySpec` output,
+- `app/server/helpers/schema`: CHEX validation of compose input and `DeploySpec` output,
   plus the `testdata/compose/` corpus. CHEX rejects unmodelled properties by
   name, which is how an unsupported compose directive fails loudly instead of
   being dropped.
-- `internal/store`: FYLO wrapper with `hd-*` collections, queue topic
+- `app/server/repositories/store`: FYLO wrapper with `hd-*` collections, queue topic
   constants, idempotent bootstrap, and the projection-rebuild path. Refuses a
   root under a file-sync tree.
-- `internal/auth`: supervised SESAME engine, the closed action vocabulary, the
+- `app/server/services/auth`: supervised SESAME engine, the closed action vocabulary, the
   four seed role bundles, and a `Decide` that fails closed — distinguishing a
   denial from an engine that did not answer.
-- `internal/api`: the authorization boundary. One decide call per route,
+- `app/server/services/api`: the authorization boundary. One decide call per route,
   before any handler, with SESAME's `reason_code` and `policy_version` in the
   audit record.
 - `cmd/heimdall`: `init`, `doctor`, `serve`, `contract`, `version`, with the

@@ -284,7 +284,7 @@ self-heal; three of the five adapters undercut that today.
 
 | Runtime | Today | Downtime |
 |---|---|---|
-| Docker Engine | `stop` → `remove` → `create` → `start` ([docker.go:307](internal/provider/docker/docker.go:307)) | **Yes**, plus nothing rolls back if the new container fails to start |
+| Docker Engine | `stop` → `remove` → `create` → `start` ([docker.go:307](app/server/services/provider/docker/docker.go:307)) | **Yes**, plus nothing rolls back if the new container fails to start |
 | Docker Swarm | `service update` with no `UpdateConfig` → Swarm's default `order: stop-first` | **Yes**, by default |
 | ECS/Fargate | `UpdateService` with no `DeploymentConfiguration` → AWS's safe 100%/200% default | No, but no circuit breaker and no failure detection |
 | Cloud Run | New revision, traffic shifts when ready | No — native |
@@ -498,7 +498,7 @@ sync's lifecycle, a scheduled job is a standing object with its own history.
 
 1. **Spec and render (1w)** — `Schedule` type, CHEX schema, `x-heimdall-schedule` parsing,
    cron and timezone validation, the five contradiction rejections, golden hash tests.
-2. **Conformance first, then adapters (2w)** — extend `internal/provider/conformance` with
+2. **Conformance first, then adapters (2w)** — extend `app/server/services/provider/conformance` with
    the scheduled-service contract (create, update cron, observe registration, delete
    removes it), then ECS, ACA, and Cloud Run against it.
 3. **Agent clock (1w)** — schedule evaluation in the agent, concurrency and deadline
@@ -594,21 +594,27 @@ HEIMDALL/
   README.md CHANGELOG.md VERSION LICENSE SECURITY.md CONTRIBUTING.md
   AGENTS.md CLAUDE.md CONTEXT.md
   api/                    versioned public contracts: openapi.json, schemas
-  cmd/heimdall/           serve | agent | init | doctor | login | app | diff | sync
-  internal/
-    git/                  clone, fetch, revision resolve, signature verification
-    render/               compose parse, interpolation, overlays, secret-ref rewrite
-    spec/                 DeploySpec, canonical JSON, content hash
-    diff/                 structural diff, redaction, health rollup
-    reconcile/            queue consumer, sync waves, hooks, prune, backoff
-    provider/             provider.go + docker/ ecs/ cloudrun/ aca/ conformance/
-    observe/              metric queries, rollups, log and event streams
-    secrets/              ${secret:...} resolvers per provider
-    store/                FYLO collections, queues, indexes, projection rebuild
-    auth/                 SESAME supervision, Decide(), host-adapter routes
-    api/                  REST + SSE, authz middleware, audit emit
+  app/                 HEIMDALL application implementation
+    client/pages/      five Tac views: home, application, instance, approval, registry
+    client/components/ scoped tac.html/tac.css views
+    client/services/   annotated page lifecycle and event coordination
+    client/models/     named browser data contracts
+    client/shared/     assets, styles, supported script facades and static utils
+    server/            merged Go 1.27 module: github.com/d31ma/heimdall/app/server
+      commands/heimdall/ native init, serve, CLI and agent entry point
+      commands/fake-engine/ isolated protocol-test command
+      controllers/     three annotated BFF HTTP fragments
+      services/        two BFF fragments plus native domain packages
+        api/ agent/ auth/ dispatch/ enroll/ observe/ provider/ reconcile/ registry/ render/
+        provider/      docker, ecs, aca, cloudrun, lambda, azurefunctions, conformance
+      helpers/         nine BFF fragments plus native git/, schema/ and secrets/
+        schema/chex/   vendored CHEX client
+      models/          nine BFF models plus native spec/ package
+        spec/          DeploySpec, canonical JSON and content hash
+      utils/          native cron/, diff/ and sequence/ packages
+      repositories/store/ native FYLO documents, collections and vendored fylo/ client
+  website/                separate public Tachyon project: eleven page routes
   schemas/                *.schema.json for CHEX
-  web/                    Tachyon: client/pages, client/components (hd-timeseries), server/routes
   docs/
     PROJECT_PLAN.md ENGINEERING_STANDARDS.md THREAT_MODEL.md
     architecture/ operations/ PHASE_N_EVIDENCE.md
@@ -618,11 +624,22 @@ HEIMDALL/
       0003-no-time-series-database.md
       0004-single-writer-control-plane.md
       0005-operation-document-over-cross-collection-writes.md
+  tests/server/          mirrored native Go package tests (official Go overlay)
+  tests/app/             operational UI/HTTP and public-site browser suites
   testdata/compose/       conformance corpus
   scripts/ .github/workflows/
 ```
 
 ---
+
+All HEIMDALL operational application implementation belongs under `app/`; the
+separate public website belongs under sibling `website/`. Native Go domain
+packages, commands and the thin BFF fragments share the Go 1.27 module under
+`app/server/`, while the BFF remains a public-HTTP proxy with no authority or
+native domain imports. CI must enforce that boundary and SDK ownership.
+The merged module, native fixes, scoped native builds/regressions, Go model
+admission and co-located framework intake remain pending qualification;
+historical phase receipts do not qualify this layout.
 
 ## Roadmap
 
@@ -643,7 +660,9 @@ HEIMDALL/
 | 6 — Hardening and HA | Active/passive via FYLO's root lock (no consensus protocol), backup/restore, DR + HA drills, rate limiting, threat model, load smoke at p99=473ms/5s SLO | [P6](docs/PHASE_6_EVIDENCE.md) |
 | 7 — GA | Quickstart, both migration guides, support tiers, generated `api/openapi.json`, five-platform release with provenance | [P7](docs/PHASE_7_EVIDENCE.md) |
 
-Roughly 16k lines of first-party Go plus tests. `go build ./...` is clean.
+The historical release recorded roughly 16k lines of first-party Go plus tests
+and a clean `go build ./...`. Fresh builds of the relocated `app/server/` layout
+remain pending.
 
 ### The standing caveats
 
@@ -683,13 +702,13 @@ webhooks. An interactive container shell, rejected on principle rather than defe
 
 Per-phase gates, each runnable:
 
-- **Schema/render** — `go test ./internal/render ./internal/spec`. A corpus in
+- **Schema/render** — the render/spec suites through `scripts/native-go.sh test`. A corpus in
   `testdata/compose/` renders to golden `DeploySpec` JSON; content hashes are stable across
   runs and machines (this also proves canonical JSON is actually canonical).
-- **Adapter conformance** — `go test ./internal/provider/conformance` runs the *same* suite
+- **Adapter conformance** — `scripts/native-go.sh test` with the provider conformance inventory runs the *same* suite
   against every adapter behind a fake, so an adapter cannot silently diverge. This is the
   single highest-value test asset in the project; it is written before the second adapter.
-- **Authorization** — `go test ./internal/auth` against a **real compiled `sesame` binary**
+- **Authorization** — the auth suite through `scripts/native-go.sh test` against a **real compiled `sesame` binary**
   and a real deployment, mirroring SESAME's own `test/adversarial` posture. Assertions: no
   grant → `403` with the expected `reason_code`; engine killed → `503`, never a bypass;
   every route in the table maps to exactly one action.
@@ -726,7 +745,7 @@ Per-phase gates, each runnable:
 | 10 | **Portainer is entrenched** — 38k stars, free tier, and a management GUI HEIMDALL deliberately will not build. "Why not just Portainer?" is the first question every evaluator asks | Med | Do not compete on GUI breadth; compete on the two things it structurally lacks — continuous reconciliation and instance observability — plus RBAC/SSO/audit in the open core rather than behind a licence. The Phase 7 migration guide should import Portainer stacks and environments so the switching cost is hours, not weeks |
 | 11 | Fan-out to large groups turns one mistake into a fleet-wide outage | Med | Bounded rollout concurrency, a failure threshold that halts the wave, and per-target `hd-operations` documents so a partial rollout is inspectable and resumable rather than an all-or-nothing retry |
 | 12 | ~~**An orphaned schedule keeps firing after its service is gone**~~ — closed by 4S — silently running a stale image, or noisily failing at 03:00 forever | Med | Every adapter deletes the schedule registration before the workload on `OpDelete`, and the conformance suite asserts a deleted service leaves no registration behind. Drift detection reads the registration, so a survivor is visible rather than merely absent from the desired state |
-| 13 | Cron plus daylight saving is a recurring source of "it ran twice" and "it never ran" | Low | *(4S: timezone is explicit, defaults to UTC, and is evaluated with the host's tzdata by `internal/cron`.)* Timezone is explicit in `x-heimdall-schedule` and defaults to UTC, never the host's local zone. ACA Jobs is UTC-only, which is a `Partial` caveat rather than a silent conversion |
+| 13 | Cron plus daylight saving is a recurring source of "it ran twice" and "it never ran" | Low | *(4S: timezone is explicit, defaults to UTC, and is evaluated with the host's tzdata by `app/server/utils/cron`.)* Timezone is explicit in `x-heimdall-schedule` and defaults to UTC, never the host's local zone. ACA Jobs is UTC-only, which is a `Partial` caveat rather than a silent conversion |
 | 14 | ~~**`Apply` returns before the runtime converges**~~ — closed by 4R | High | Shipped: post-apply health gate holding for `monitor`, `failure_action: rollback` re-applying the previous `DeploySpec`, HD0273 on timeout. The lease heartbeat is a seam (`Engine.Heartbeat`) with no queue consumer to use it yet |
 | 15 | ~~Zero-downtime is impossible on standalone Docker for a service publishing a host port~~ — closed by 4R | Med | Shipped: HD0338 rejects `order: start-first` at plan time naming the port and the three ways out; portless services get a real create-wait-swap; single-node Swarm is documented as the answer on a single VPS |
 

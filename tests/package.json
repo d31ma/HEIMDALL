@@ -1,0 +1,5 @@
+{
+  "name": "heimdall-tests",
+  "private": true,
+  "type": "module"
+}

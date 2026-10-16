@@ -1,5 +1,13 @@
 # Phase 1 evidence — Vertical slice: Docker Engine
 
+Package references below use the 2026-10-03 `app/server/` layout. These results
+remain historical evidence from their original source snapshots; the package
+move does not requalify them. External runtime receipts retain original paths
+and hashes.
+Recorded command blocks retain their original snapshot paths and working
+directory. Current native qualification uses explicit scopes from
+`app/server/`; these historical commands are not current build instructions.
+
 What the phase claimed, what is actually true, and how to check it. Anything
 not proven is listed as not proven.
 
@@ -17,9 +25,9 @@ not proven is listed as not proven.
 | Drift visible | **Proven** | `TestDriftIsVisible`, `TestOutOfBandRemovalIsDrift`. Latency is not measured: Phase 1 reads on request, so "within 60s" is a Phase 2 polling claim |
 | One-service change syncs cleanly | **Proven** | `TestOneServiceChangeSyncsCleanly` — asserts the untouched container is not recreated |
 | Every mutating call attributable | **Proven** | `TestEveryDecisionIsAudited`, and `TestVerticalSlice` asserts `principal_id` and `policy_version` on the operation document |
-| Tachyon UI | **Proven by hand, not by test** | `web/` holds the app list, app detail, diff view, sync, dry run, rollback, and history. Driven in a real browser against a real control plane: sign in, list, open an application, run a dry run, and see the failure and the audit row it produced |
+| Tachyon UI | **Proven by hand, not by test** | `app/` holds the app list, app detail, diff view, sync, dry run, rollback, and history. Driven in a real browser against a real control plane: sign in, list, open an application, run a dry run, and see the failure and the audit row it produced |
 | `heimdall login` over **device authorization** | **Proven** | The full RFC 8628 flow ran live: `heimdall login --device` printed a code, the code was approved through the web tier's gateway, the CLI received tokens, called the API with them, and refreshed with rotation when the token expired |
-| Agent, outbound mTLS | **Proven** | `internal/agent` enrols, polls, applies, and reports. `TestEnrollAndDeploy` runs the real agent against a real TLS control plane; the enrollment, mTLS, poll, and report round trip was also driven end to end with the built binaries |
+| Agent, outbound mTLS | **Proven** | `app/server/services/agent` enrols, polls, applies, and reports. `TestEnrollAndDeploy` runs the real agent against a real TLS control plane; the enrollment, mTLS, poll, and report round trip was also driven end to end with the built binaries |
 
 ## How to reproduce
 
@@ -38,18 +46,18 @@ run with skips proves less than it looks like.
 
 | Package | Responsibility |
 |---|---|
-| `internal/render` | Compose → `DeploySpec`: overlays with Compose's own merge rules, single-pass interpolation, `${secret:...}` rewritten to references |
-| `internal/git` | Bare mirror, ref resolution, file reads at a commit, optional signature verification |
-| `internal/provider` | The adapter interface, `Capabilities`, plan-time `Validate`, resource-tier snapping |
-| `internal/provider/docker` | Docker Engine adapter over the Engine API, stdlib only |
-| `internal/provider/conformance` | The suite every adapter must pass |
-| `internal/provider/docker/dockertest` | A fake Engine, so the adapter is covered without a daemon |
-| `internal/diff` | Field-level spec diff, sync status, health rollup |
-| `internal/reconcile` | Refresh, status, sync, dry run, rollback, selective sync |
-| `internal/enroll` | Fingerprint-pinned enrollment tokens, the agent CA, and the control plane's own TLS certificate |
-| `internal/dispatch` | The rendezvous for outbound-only agents, and `Remote`, which makes an agent-managed target a `provider.Provider` |
-| `internal/agent` | The host process: enrol, long-poll, apply, report |
-| `cmd/heimdall` | `login`, `app`, `diff`, `sync`, `enroll`, `agent` added to the Phase 0 verbs |
+| `app/server/services/render` | Compose → `DeploySpec`: overlays with Compose's own merge rules, single-pass interpolation, `${secret:...}` rewritten to references |
+| `app/server/helpers/git` | Bare mirror, ref resolution, file reads at a commit, optional signature verification |
+| `app/server/services/provider` | The adapter interface, `Capabilities`, plan-time `Validate`, resource-tier snapping |
+| `app/server/services/provider/docker` | Docker Engine adapter over the Engine API, stdlib only |
+| `app/server/services/provider/conformance` | The suite every adapter must pass |
+| `app/server/services/provider/docker/dockertest` | A fake Engine, so the adapter is covered without a daemon |
+| `app/server/utils/diff` | Field-level spec diff, sync status, health rollup |
+| `app/server/services/reconcile` | Refresh, status, sync, dry run, rollback, selective sync |
+| `app/server/services/enroll` | Fingerprint-pinned enrollment tokens, the agent CA, and the control plane's own TLS certificate |
+| `app/server/services/dispatch` | The rendezvous for outbound-only agents, and `Remote`, which makes an agent-managed target a `provider.Provider` |
+| `app/server/services/agent` | The host process: enrol, long-poll, apply, report |
+| `app/server/commands/heimdall` | `login`, `app`, `diff`, `sync`, `enroll`, `agent` added to the Phase 0 verbs |
 
 ## Decisions worth recording
 
@@ -151,7 +159,7 @@ shadowed by a default. Creating a registry is authorized with `secret:bind`,
 which is exactly what it is; the action vocabulary is unchanged and
 `secret:bind` finally has a route.
 
-**Fingerprint-pinned enrollment (`internal/enroll`).** The token carries the
+**Fingerprint-pinned enrollment (`app/server/services/enroll`).** The token carries the
 control plane's URL, the target id, an expiry, and the SHA-256 of the control
 plane's TLS certificate, under an HMAC. The agent pins that fingerprint before
 it will send the token, so a machine-in-the-middle on the first connection is
@@ -184,7 +192,7 @@ and are refused with a message naming the phase rather than returning empty.
 
 ## The web tier
 
-`web/` is a Tachyon project with two Yon routes and two Tac pages. It holds no
+`app/` is a Tachyon project with two Yon routes and two Tac pages. It holds no
 business logic and makes no authorization decision — see ADR 0009 for why the
 session is an httpOnly cookie and why there is one gateway route rather than
 seven.

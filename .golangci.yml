@@ -21,7 +21,7 @@ linters:
     rules:
       # Vendored client shims carry their upstream's style, and reformatting
       # them would make the refresh in scripts/vendor-clients.sh a merge.
-      - path: 'internal/(store/fylo|schema/chex)/'
+      - path: '(app/server/)?(repositories/store/fylo|helpers/schema/chex)/'
         linters:
           - errcheck
           - staticcheck

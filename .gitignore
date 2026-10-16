@@ -2,22 +2,22 @@
 .env
 .env.*
 !.env.example
-# Root-anchored: internal/secrets and the docs' secrets pages are source
+# Root-anchored: server/helpers/secrets and the docs' secrets pages are source
 /secrets/
 *.key
 # Points at a local control plane; only the example ships
-web/server/data/bff.json
+app/server/data/bff.json
 
 # Runtime state: FYLO roots and SESAME deployments must never be committed
 .heimdall/
 fylo-root/
-# Root-anchored: web/server/data holds the committed bff.example.json
+# Root-anchored: app/server/data holds the committed bff.example.json
 /data/
 
 # Build and test output
 bin/
 dist/
-web/test-results/
+app/test-results/
 /heimdall
 *.test
 *.prof
@@ -31,6 +31,6 @@ Thumbs.db
 
 # Vendored by scripts/vendor-duvay.sh, never committed — the CI web job
 # enforces it. One source of truth lives in the DUVAY checkout.
-web/client/shared/assets/duvay/
+app/client/shared/assets/duvay/
 website/client/shared/assets/duvay/
 node_modules/

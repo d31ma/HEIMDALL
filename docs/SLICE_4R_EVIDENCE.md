@@ -1,5 +1,10 @@
 # Slice 4R evidence — rollout strategy and convergence
 
+Package references below use the 2026-10-03 `app/server/` layout. These results
+remain historical evidence from their original source snapshots; the package
+move does not requalify them. External runtime receipts retain original paths
+and hashes.
+
 The slice designed in [PLAN.md](../PLAN.md#rollout-strategy-and-convergence). It
 closes two standing risks (14 and 15 in the plan's risk table) rather than
 adding a feature: before it, `Apply` returned when the calls were submitted, so
@@ -9,7 +14,7 @@ a failed rollout reported success and came back minutes later as drift.
 
 | Claim | Where |
 |---|---|
-| `deploy.update_config` parses, defaults (`stop-first`, `pause`), and rejects bad values by name | `internal/render` — `TestUpdateConfigRendersWithDefaults`, `TestUpdateConfigRejectsBadValues` (HD0219) |
+| `deploy.update_config` parses, defaults (`stop-first`, `pause`), and rejects bad values by name | `app/server/services/render` — `TestUpdateConfigRendersWithDefaults`, `TestUpdateConfigRejectsBadValues` (HD0219) |
 | The strategy is part of the revision's content hash | `spec.Service.Update`, `schemas/deployspec.schema.json`; a converged re-apply is still a noop with `update_config` set — conformance `RolloutStrategyConverges`, on all five adapters |
 | Swarm receives its native `UpdateConfig`, durations in nanoseconds | `TestSwarmUpdateConfigIsPassedThrough` |
 | ECS receives a `DeploymentConfiguration`: start-first 100/200, stop-first 0/100, `rollback` → deployment circuit breaker | `TestUpdateConfigReachesTheDeploymentConfiguration` |

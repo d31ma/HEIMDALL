@@ -3,7 +3,7 @@
  * for an air-gap-friendly tool should not fetch its stylesheet from a CDN.
  * Utilities only: DuVay owns the base styles and the tokens. */
 
-@import "../../../../web/node_modules/tailwindcss/theme.css" layer(theme);
-@import "../../../../web/node_modules/tailwindcss/utilities.css" layer(utilities);
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
 
 @source "../../";

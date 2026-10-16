@@ -8,7 +8,7 @@ cd "$(dirname "$0")/.."
 work=$(mktemp -d /tmp/hd-ha.XXXXXX)
 trap 'pkill -f "hd-ha serve" 2>/dev/null || true; rm -rf "$work"' EXIT
 
-go build -o "$work/hd-ha" ./cmd/heimdall
+go -C app/server build -o "$work/hd-ha" ./commands/heimdall
 export HD_PUBLIC_URL=https://127.0.0.1:18643 HD_ADMIN_PASSWORD='pw-for-ha-drill-123456789'
 "$work/hd-ha" init --deployment "$work/dep" --admin ops >/dev/null
 

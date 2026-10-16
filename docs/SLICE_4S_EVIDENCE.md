@@ -1,5 +1,10 @@
 # Slice 4S evidence — scheduled and batch workloads
 
+Package references below use the 2026-10-03 `app/server/` layout. These results
+remain historical evidence from their original source snapshots; the package
+move does not requalify them. External runtime receipts retain original paths
+and hashes.
+
 The slice designed in [PLAN.md](../PLAN.md#scheduled-and-batch-workloads). A nightly
 backup now has somewhere to live: `x-heimdall-schedule` on a compose service,
 registered with the runtime's own scheduler.
@@ -8,12 +13,12 @@ registered with the runtime's own scheduler.
 
 | Claim | Where |
 |---|---|
-| `x-heimdall-schedule` parses, defaults (UTC, `forbid`), and validates cron, timezone, concurrency, and durations | `internal/render` — `TestScheduleRendersWithDefaults` |
+| `x-heimdall-schedule` parses, defaults (UTC, `forbid`), and validates cron, timezone, concurrency, and durations | `app/server/services/render` — `TestScheduleRendersWithDefaults` |
 | A scheduled service rejects `ports`, `deploy.replicas`, `restart`, `healthcheck`, `depends_on`, `update_config`, and `catchup` by name (HD0221) | `TestScheduledServiceRejectsContradictions`, thirteen cases |
 | The schedule is part of the content hash, so a cron edit plans as an update | `spec.Service.Schedule` in canonical JSON; conformance asserts the re-plan |
-| Cron evaluation is correct in a named timezone, and an impossible schedule never fires | `internal/cron` — `TestNextFiringTimes` (including Europe/Berlin), `TestImpossibleScheduleNeverFires`, `TestBadExpressionsAreRefused` |
+| Cron evaluation is correct in a named timezone, and an impossible schedule never fires | `app/server/utils/cron` — `TestNextFiringTimes` (including Europe/Berlin), `TestImpossibleScheduleNeverFires`, `TestBadExpressionsAreRefused` |
 | Every adapter answers for scheduled workloads, and a rejecting one refuses at plan time naming the service | conformance `ScheduledWorkloads`, on all five adapters |
-| ECS registers an EventBridge schedule, re-registers on a cron change, and reads it back through `Observe` | conformance `ScheduledWorkloads` against the fake AWS, plus the five-field-to-EventBridge translation in `internal/provider/ecs/schedule.go` |
+| ECS registers an EventBridge schedule, re-registers on a cron change, and reads it back through `Observe` | conformance `ScheduledWorkloads` against the fake AWS, plus the five-field-to-EventBridge translation in `app/server/services/provider/ecs/schedule.go` |
 | Deleting a scheduled service deletes the registration *first* | conformance `ScheduledWorkloads` (the last assertion), and `TestUnregisterLeavesNothingBehind` |
 | The agent's clock fires a due schedule, runs the container with the deploying revision's labels, and records the outcome | `TestDueScheduleRuns` |
 | A run that exits non-zero is recorded as failed rather than silently green | `TestFailedRunIsRecordedAsFailed` |
@@ -31,7 +36,7 @@ registered with the runtime's own scheduler.
 | Running a long-running service is refused (HD0279): run is for jobs | `TestRunningAnOrdinaryServiceIsRefused` |
 | A Docker target's manual run reaches the agent's clock over the existing mTLS rendezvous, as a new job kind | `dispatch.KindRun`, handled in `agent.ExecuteJob` |
 | A scheduled service deploys as a registration and no container | same end-to-end test: the fake Engine holds zero containers after the sync |
-| The instance page carries runs, next-run time, and a Run now button — and no exec, files, or lifecycle controls | `web/tests/ui.spec.js`, the tabbed-instance-page test |
+| The instance page carries runs, next-run time, and a Run now button — and no exec, files, or lifecycle controls | `tests/app/ui.spec.js`, the tabbed-instance-page test |
 
 ## What is not implemented, deliberately
 
@@ -56,7 +61,7 @@ registered with the runtime's own scheduler.
   prefix whose description is not HEIMDALL's is left alone.
 - **Six-field cron is refused, not translated.** AWS and Quartz put seconds
   first; POSIX does not. Guessing which one an expression means is how a
-  nightly job runs every minute, so `internal/cron` accepts five fields only
+  nightly job runs every minute, so `app/server/utils/cron` accepts five fields only
   and the ECS adapter translates explicitly, including the day-of-week
   numbering shift and the `?` rule.
 - **Executions are exited containers, not a second store.** The agent keeps the

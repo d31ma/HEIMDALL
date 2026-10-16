@@ -120,3 +120,5 @@ a:focus-visible, .w-btn:focus-visible {
 }
 .docs-article th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--w-text-muted, #666); }
 .docs-article a { color: var(--w-primary, #b45309); }
+
+.site-nav-link.next { text-align: right; }

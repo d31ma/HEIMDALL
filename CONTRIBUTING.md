@@ -11,8 +11,10 @@ change, not a follow-up task.
 
 ```bash
 scripts/install-deps.sh     # fylo, sesame, chex into ~/.local/bin
-go build ./...
-go test ./...
+export HD_BUILD_DIR=/tmp/heimdall-build
+mkdir -p "$HD_BUILD_DIR"
+go -C app/server build -o "$HD_BUILD_DIR/heimdall" ./commands/heimdall
+scripts/native-go.sh test
 scripts/ci-gates.sh
 ```
 
@@ -20,13 +22,31 @@ Tests drive real compiled binaries rather than fakes. An authorization test
 against a stub would return "allow" and prove nothing. Tests skip when a binary
 is absent, so check for skips before believing a green run.
 
+The public website is a separate Tachyon project under `website/`.
+
+Build and test only in an isolated execution checkout with external caches,
+output and runtime state. These current command paths are pending qualification;
+historical passing receipts belong to their recorded source layouts.
+
 ## What CI enforces
 
 `gofmt`, `go vet`, `golangci-lint`, `go test`, `govulncheck`, a dependency
 licence allowlist, and `scripts/ci-gates.sh`. The gates check for absence: no
 password hashing, no role-name comparison, no token minting, no literal
-credentials in fixtures, no cloud SDK outside `internal/provider/`, no
-shell-invoked subprocesses, no `utils`/`helpers`/`common` packages.
+credentials in fixtures, no cloud SDK outside `app/server/services/provider/`, no
+shell-invoked subprocesses and no generic `utils`/`helpers`/`common` Go packages.
+The requested `app/server/helpers/` and `app/server/utils/` role directories contain
+named domain packages. The native commands and these domain packages share the
+merged Go 1.27 module with 23 BFF fragments. BFF fragments must import no native
+authoritative domain package and retain public-HTTP forwarding; explicit CI
+checks replace the former Go `internal/` visibility guard. Operational application logic belongs under `app/`; the public site lives in
+sibling `website/`. The merged module, native fixes and framework intake need
+fresh qualification. Authored tests live under sibling `tests/`: native Go tests
+in `tests/server/`, operational UI/HTTP tests in `tests/app/`. Use the explicit
+`scripts/native-go.sh` scope and its Go overlay or exact isolated staging closure;
+a direct package test without mapped test sources could falsely run no cases.
+Overlay test discovery and whitebox package access remain unqualified.
+Do not traverse package-less Yon fragments with an unfiltered `./...`.
 
 ## Conventions
 
@@ -54,7 +74,7 @@ corruption found much later. `store.Open` refuses the obvious cases; point
 
 ## Vendored code
 
-`internal/store/fylo` and `internal/schema/chex` are copied verbatim from
+`app/server/repositories/store/fylo` and `app/server/helpers/schema/chex` are copied verbatim from
 upstream Rust projects that do not publish Go modules. Do not edit them here —
 change them upstream and re-run `scripts/vendor-clients.sh`. SESAME is a real Go
 module and is a `go get`.

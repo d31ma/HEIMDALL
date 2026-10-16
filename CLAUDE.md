@@ -43,20 +43,65 @@ Compose** workloads — ArgoCD's four mechanics (git as truth, deterministic des
 continuous live-state read-back, diff and close) applied to Docker Engine, Docker Swarm,
 Amazon ECS, Azure Container Apps, and Google Cloud Run.
 
-You work across the Go control plane (`cmd/`, `internal/`), the Tachyon web tier
-(`web/`), CHEX schemas (`schemas/`), public contracts (`api/`), tests, release
+You work across the Go control plane and command packages under `app/server/`, the Tachyon web tier
+(`app/`), CHEX schemas (`schemas/`), public contracts (`api/`), tests, release
 engineering, and documentation.
 
 ## Architecture
 
-- One Go modular monolith, `heimdall`, is the control plane. It owns every HTTP listener.
+- One Go modular monolith, `heimdall`, is the control plane. It owns the authoritative control-plane HTTP listeners.
 - `sesame` and `fylo` are **child processes** it supervises over NDJSON on stdin/stdout.
   Neither has a port. Startup order is `fylo` → `sesame doctor` → `heimdall serve`.
-- Tachyon (`ty`) is the web UI and a **thin BFF proxy** — Yon handlers run JS/TS/Python,
-  not Go, so no business logic lives there.
+- Tachyon (`ty`) is the web UI and a **thin BFF proxy**. Qualified compiler 31 supports Go Yon handlers. Production application server logic, including the BFF, is Go; authoritative business logic lives in native Go domain packages under `app/server/`; the co-located Yon BFF remains a thin HTTP proxy with no authority. The UI remains JavaScript or TypeScript.
 - `heimdall agent` runs on Docker Engine hosts, outbound-only over mTLS.
 - Everything flows through one canonical type: compose + overlays + secret refs →
   `DeploySpec` (provider-neutral, CHEX-validated, content-hashed) → provider adapter.
+
+**Permanent source rule: HEIMDALL application logic lives under `app/`.**
+Samuel explicitly requested renaming the operational `web/` directory to `app/`
+and keeping the public `website/` as its sibling. Public-site logic belongs in
+`website/`; it is the explicit exception to the operational application root.
+Do not recreate root `web/`, `internal/`, `server/` or `cmd/` implementations or a root
+Go module. The merged Go 1.27 module is `app/server/go.mod`, named
+`github.com/d31ma/heimdall/app/server`; native commands live under
+`app/server/commands/heimdall/` and `app/server/commands/fake-engine/`.
+The separate public website is a Tachyon project under sibling `website/`.
+This latest layout overrides the earlier all-under-`web/` source rule.
+Public `api/` contracts, `schemas/` and `testdata/` fixtures remain repository
+assets, not alternative application implementations. `scripts/` contains
+maintenance and qualification tooling only.
+
+**Permanent test-source rule: authored tests live under sibling `tests/`.**
+Native Go tests are mirrored under `tests/server/`, outside `app/server/`;
+operational UI, HTTP and public-site browser fixtures live under `tests/app/`.
+Native tests retain
+their private package labels through the official Go overlay supplied by
+`scripts/native-go.sh`, or an exact isolated staging closure. Never infer
+a passing regression from native packages compiled without their relocated
+tests. Overlay discovery, exact source hashes and runtime validation are pending.
+
+The Go control plane and the 23 Yon BFF fragments share source roles and a module,
+not authority. Native domain packages own the control-plane HTTP API service, other services,
+helpers, specifications, repositories and `utils`. The BFF has three controllers,
+two services, nine helpers and nine models and communicates with the control
+plane through public HTTP. The three actual Yon controller fragments have names
+ending in `Controller`. The native HTTP API package is a Go service under
+`app/server/services/api/`, with mirrored tests under `tests/server/services/api/`;
+it retains package `api` and is not a Yon controller or a BFF DI service. It imports no authoritative domain package and opens
+no FYLO root or SESAME engine. Provider and secret SDKs keep their documented
+native package boundaries. Explicit CI dependency checks must enforce these
+rules; directory placement and Go module membership do not confer permission.
+Native Go model admission and co-located companion/framework compatibility are
+pending qualification. Prior native and BFF receipts qualify prior layouts.
+
+Yon should parse and validate declared custom request models at the boundary.
+Qualified compiler 32 supports `@FromBody` on annotated Go controller inputs;
+plain handler restrictions must not be applied to those annotated controllers.
+The BFF's current native request/response implementation has not completed this
+typed-model migration. Exact status, headers, cookies and response-body behavior,
+native field/model admission and the source bridge require proof before any
+current typed request/response runtime pass is claimed. Never add fake Yon
+registrations to the independent native API service package.
 
 ## Non-negotiable rules
 
@@ -106,8 +151,8 @@ change, not a follow-up task.
 - **Deleting a scheduled service deletes its schedule registration first.** An orphaned
   rule fires at 03:00 forever against a stale image. The conformance suite asserts this.
 - **Cloud SDK ownership is explicit.** Runtime-provider SDKs belong in
-  `internal/provider/<name>/`; cloud secret-store SDKs belong in the existing
-  `internal/secrets/` resolver. The current CI gate enforces these boundaries.
+  `app/server/services/provider/<name>/`; cloud secret-store SDKs belong in the existing
+  `app/server/helpers/secrets/` resolver. CI gates must enforce these boundaries.
 - **The web tier decides nothing.** Tachyon attaches a session and forwards; it holds
   no business logic and makes no authorization decision, and the session lives in an
   httpOnly cookie rather than in the page (ADR 0009).
@@ -140,7 +185,7 @@ change, not a follow-up task.
 - **`tofu apply` always requires approval by default**, `infra:approve` is grantable
   separately from `infra:apply` (four-eyes), and auto-apply is blocked on any
   delete/replace. Parse `tofu show -json`, never human-readable output.
-- The **adapter conformance suite** (`internal/provider/conformance`) runs against every
+- The **adapter conformance suite** (`app/server/services/provider/conformance`) runs against every
   adapter. Extend it before adding an adapter, never after.
 
 ## Naming and conventions
@@ -155,7 +200,17 @@ Inherited from `TACHYON/docs/ENGINEERING_STANDARDS.md`:
 - One project env namespace: `HD_`.
 - Public contracts live under `api/`; generated output identifies its source and is never
   hand-edited. The capability matrix is generated from `Capabilities()`.
-- No `utils`, `helpers`, `common`, `shared`, `misc`, `base`, or `manager` packages.
+- `app/server/helpers/` and `app/server/utils/` are the explicitly requested role
+  directories; their packages have domain names such as `git`, `diff` and
+  `schema`. Do not add generic `utils`, `helpers`, `common`, `shared`, `misc`,
+  `base`, or `manager` Go packages. Samuel explicitly requested the role name
+  `utils`; its Go packages remain `cron`, `diff` and `sequence`, with mirrored
+  tests under `tests/server/utils/`. The directory name does not introduce a
+  generic `utils` Go package or change package visibility/runtime semantics.
+  Supported Yon roles under `app/server/`
+  remain a separate framework boundary: controllers, services, helpers and
+  models. Native Go transport structs belong in BFF models and retain their
+  native fields; qualified compiler admission remains pending for those types.
 - Build vertical slices. Bound input, recursion, queues, concurrency, retries, and
   external reads. Never invoke subprocesses through a shell.
 - ADRs only for hard-to-reverse decisions with real tradeoffs. Domain language lives in
@@ -163,7 +218,7 @@ Inherited from `TACHYON/docs/ENGINEERING_STANDARDS.md`:
 
 ## Key project details
 
-- **Language**: Go 1.26 (control plane, agent), JavaScript (Tachyon Tac/Yon web tier)
+- **Language**: Go 1.27 (merged native control plane, agent and generated Yon module), JavaScript (Tachyon Tac UI)
 - **Store**: FYLO — collections namespaced `hd-*` (hyphen: FYLO rejects underscores in
   collection names), matching SESAME's `sesame-*`
 - **Auth**: SESAME (developer preview — pin an exact version)
@@ -176,8 +231,13 @@ Inherited from `TACHYON/docs/ENGINEERING_STANDARDS.md`:
 
 ## Validation
 
-Use the toolchain selected by `go.mod`. Run the smallest affected Go package
-tests, then `go test ./...` and `go vet ./...` as appropriate. The repository's
+Use the toolchain selected by `app/server/go.mod`. Run native qualification
+through `scripts/native-go.sh`, which must select explicit domain-package and
+command scopes and map `tests/server/` into the native package test view. Do not
+run an unfiltered `./...` across package-less Yon role fragments. Qualify those
+BFF fragments through the pinned Tachyon build and generated Go runtime.
+The current module consolidation, model admission and native fixes remain
+unqualified until their exact source/build/test receipts are recorded. The repository's
 `scripts/ci-gates.sh` defines broader security and contract gates; inspect it
 before executing because checks have distinct tool and artifact prerequisites.
 Use named end-to-end and recovery scripts only against the intended isolated

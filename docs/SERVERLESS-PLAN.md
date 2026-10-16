@@ -1,14 +1,48 @@
 # Serverless workload providers
 
-Status: native SDK protocol/conformance and focused API/registry/Node integration
-passed on 2026-10-03. Full regression, method-level CRAP, native image tests and
-qualified compiler 28 app/browser acceptance remain pending.
+Status: the native qualification checkpoint passed all 31 Go packages, vet,
+an isolated Go 1.26 control-plane build, and the measured changed-method
+complexity gate on 2026-10-03: 1,062
+changed methods, maximum CRAP 13.125 against a limit of 15. Native Lambda,
+Azure Functions and Cloud Run package coverage was 90.5%, 92.4% and 74.7%.
+These are local adapter/SDK and regression results. Native image hosts and live
+cloud operation have not been qualified.
+These results qualify the recorded pre-relocation snapshots. Samuel's subsequent
+permanent rule places operational application logic under `app/` and public-site logic under `website/`: native control-plane,
+agent and command packages share the Go 1.27 `app/server` module with the thin
+Yon BFF fragments. Co-location preserves the public-HTTP authority boundary;
+the BFF imports no authoritative native domain package and opens no FYLO root
+or SESAME engine. Explicit CI checks must enforce that and SDK ownership.
+The consolidated module, command/domain-package scopes and companion/framework
+source intake require fresh qualification. Native fixes are implemented but
+unrun; prior qualification drivers using root package paths are stale. Static
+companion-source review predicts `TY1363` and `TY1310`, alongside the native-model
+`TY2015` below. These identify framework admission blockers by source inspection,
+not by a compiler run. The separate public website now lives at `website/`
+and also requires fresh consumer qualification after relocation.
+The three native BFF transport structs also move byte-for-byte into
+`app/server/models/`, making nine models alongside three controllers, two
+services and nine helpers. Their native field types require separate Tachyon
+model/schema qualification. The 49 HTTP and 22 app browser assertions below
+precede that model move; no current runtime pass is claimed for the new layout.
+Static compiler 31/32 review predicts `TY2015` from the model schema checker for
+imported native fields. Native Go model admission is a framework blocker awaiting
+a qualified fix; no compiler execution or replacement JSON types are asserted.
+The native HTTP API package now belongs under `app/server/services/api/`,
+retaining package `api` and mirrored tests under `tests/server/services/api/`.
+The three actual Yon controllers remain separate and named `Controller`.
+Qualified compiler 32 supports custom `@FromBody` inputs on annotated Go
+controllers, but the current BFF has not completed the requested framework-owned
+request/response model migration. Status, headers, cookies, body and native
+model fields need distinct proof; no current typed-model runtime pass is claimed.
 Research checked against official provider documentation on 2026-10-03.
 
-The project is DELMA/HEIMDALL. The working baseline includes existing uncommitted
-Drive changes, preserved in an independent local snapshot. The source inventory,
-baseline commit, compiler checksum, validation receipts and implementation queue
-live beside the checkout in `../heimdall-evidence/`.
+The project is DELMA/HEIMDALL. The original Drive working copy and existing
+uncommitted work were preserved before the approved canonical migration.
+Canonical authored source is under `myOrganizations/DELMA/HEIMDALL` in Drive;
+dependencies, runtime state and build products stay in the external Developer
+Build tree. Redacted source hashes, receipts and the implementation queue are
+under Dropbox `AI/shared/codex/recovery/DELMA/2026-10-03/heimdall-web-qualification`.
 
 ## Accepted scope
 
@@ -87,7 +121,7 @@ also reject an ordinary image declaration rather than treating it as a handler.
 
 ## Lambda adapter contract
 
-Keep AWS SDK imports under `internal/provider/lambda`. Target configuration
+Keep AWS SDK imports under `app/server/services/provider/lambda`. Target configuration
 supplies an existing `execution_role_arn`; it must never create a role or attach
 policies. Use default credential resolution consistently with the ECS adapter.
 An image must be digest-pinned in ECR in `Target.Region`. The initial mode is
@@ -180,14 +214,34 @@ with the Lambda Runtime Interface Emulator and Azure Functions host where
 those runtimes are available. Those tests establish local runtime behavior,
 not live-cloud qualification.
 
-Tachyon qualification uses immutable compiler 28, source
-`1c948dde96c620f522b4f7c8efb71ced1aa0aca7`, SHA-256
-`cadfafef03721b0cec06647449a276bff0b7d3dacd6b53d8ac63e6c799e1bf63`.
-Its qualified manifest and exact bytes were verified; HEIMDALL bundle/browser
-compatibility has not yet been tested.
-Fresh bundle and browser checks preserve the existing cookie/BFF boundary.
-Do not substitute a compiler candidate. Run each build/test only after the
-coordinating task grants the shared machine lane.
+The accepted Tachyon handoff is qualified-scoped compiler 31, source
+`3b6589f22acbe73a1b3ddcc75ea4438ec286d3de`, SHA-256
+`9f83f0636968438548eccc6a81c5c49e9395462f564cb18feef3f4488cd60608`.
+Its manifest and exact Mac arm64 bytes were verified. The fresh app build,
+generated semantic check and all 22 browser assertions passed. The original QA
+driver failed during cleanup; its failure and verified process cleanup are
+retained separately in `app-validation04-compiler31-recovered.json`.
+Compiler 31 subsequently passed all 49 Go HTTP boundary checks without skips,
+plus the fresh eleven-route website build, semantic check and five browser tests.
+The granted consumer scope completed in 23.481 seconds with unchanged source
+hashes and no owned processes remaining; see `HEIMDALL-LANE-RETURN31-02.json`
+and `website-validation06-compiler31.json` in the evidence directory above.
+
+The 13 ordinary full-path browser scenarios remain unqualified. The first
+attempt failed before build or browser execution because `HD_PUBLIC_URL` was
+referenced before assignment. The corrected retry built the Go 1.27 control
+plane and fixture engine, initialized and logged in, but timed out after
+30 seconds during API setup; no browser scenario ran. Both failures and verified
+cleanup are preserved in `HEIMDALL-LANE-RETURN31-FULLPATH01.json` and
+`HEIMDALL-LANE-RETURN31-FULLPATH02.json`. A separate setup-only diagnostic
+isolated the second sync after changing the web service revision while leaving
+the cache service unchanged. Repository, target and application creation and
+the first sync succeeded. The diagnostic establishes the failed stage, not a
+qualified causal repair. No blanket timeout increase or successful full-path
+result is asserted.
+
+No qualified Linux artifact has been handed off for CI. Each build/test requires
+the coordinating task's shared-machine lane grant.
 
 No live provider account has been qualified by this task. Source edits,
 fake-protocol passes, local image runtime tests, web build and real browser
@@ -196,50 +250,32 @@ completion. Full local regression, applicable security gates and reviewed
 operational documentation precede any later release request.
 
 
-## API and web integration queue
+## API and web integration
 
-Source inspection found the existing `run` endpoint is a scheduled-job command
-with no payload or synchronous result. Function invocation must remain a
-separate route and provider `Invoker` call; it must not change `Runner.RunNow`.
-The existing `app:run` action is the appropriate execution permission candidate,
-with exactly one existing SESAME boundary decision on the application resource.
-Before implementing it, verify the action description and generated contract
-against this broadened workload execution scope; do not add authorization logic.
+The invocation route is
+`POST /api/v1/projects/{project}/apps/{app}/services/{service}/invoke`, distinct
+from scheduled-job `Runner.RunNow`. The control plane applies the existing
+SESAME `app:run` boundary decision, resolves stored application/target identity,
+rejects suspended or undeclared functions and incompatible adapters, and keeps
+payloads transient. Requests cannot select a target or native version.
 
-The planned route is `POST /api/v1/projects/{project}/apps/{app}/services/{service}/invoke`.
-Resolve the application and target from stored identity, reject suspended apps,
-require a declared function in the rendered revision, and fail explicitly when
-the adapter does not implement `Invoker`. Do not let body fields select a target,
-app, service or version. Payload and response are transient; the existing audit
-records path/action/decision metadata, never handler input or output.
+Input is bounded to 256 KiB JSON and a 384 KiB envelope; the control-plane wait
+ends after 45 seconds. The Go BFF clamps its upstream deadline to 25 seconds,
+within Yon's 30-second deadline, and rejects oversized or malformed responses.
+Its gateway bounds are 8 MiB raw UTF-8 and 15 MiB encoded frames, below the
+framework's 16 MiB limit. Cancellation or a transport timeout does not prove
+native work stopped. Direct invocation is not automatically retried.
 
-The current server has a three-minute write timeout and the BFF defaults to a
-60-second upstream timeout with a configurable ceiling. Lambda allows a longer
-execution timeout. The first synchronous API must therefore document a bounded
-request deadline and an ambiguous timeout outcome: cancellation ends the wait,
-not native work that already started. Do not automatically retry, report a
-transport timeout as a handler failure, or claim cancellation stopped native
-execution. Long-running/asynchronous delivery is a later explicit contract.
-The BFF remains a proxy and preserves its httpOnly session and CA verification.
-
-The existing BFF permits a 1MiB JSON envelope and uses a 32MiB response ceiling.
-The provider permits 6MiB Lambda payloads. The first browser-facing API must use
-an explicit smaller byte limit compatible with the envelope, while preserving
-native limits for direct adapter callers. Source inspection also found that the
-BFF client currently truncates oversized responses rather than rejecting them;
-fix and test that transport behavior before exposing function results.
-
-Function observations need service/version routes using `FunctionObserver`,
-separate from instance CPU/memory routes. The UI should show deployment readiness
-and native invocation counts/errors/throttles/duration units. Empty execution
-inventory must not render as missing or failed deployment. Existing container
-and scheduled-job pages retain their current behavior.
-
-Pending evidence: focused API tests proving one boundary decision and deny/error
-handling; suspended/undeclared function and incompatible provider refusal;
-byte/deadline bounds; no invocation payload in persistence/audit; handler error
-separate from transport failure; BFF byte-bound and no-retry checks; real browser
-acceptance under the selected qualified compiler. These are planned, not passed.
+Function versions/readiness are distinct from execution-instance inventory.
+The browser offers declared Lambda JSON invocation without retry, preserves
+handler errors separately from transport errors, and does not manufacture
+replicas. Azure has no qualified HTTP invocation or execution telemetry
+contract yet; the interface reports unavailable capability explicitly.
+Local API/provider regressions passed in the 31-package run. The Go BFF's 49
+HTTP checks passed without skips under qualified compiler 31.
+Compiler 31 passed the app semantic check and 22 browser assertions, including
+function/version and stale-response fixtures. Intercepted browser responses
+are not native-host or live-cloud evidence.
 
 ## Azure telemetry follow-up
 
@@ -279,7 +315,7 @@ Sources: [Container Apps metrics](https://learn.microsoft.com/en-us/azure/azure-
 
 ## Integration candidate after the provider checkpoint
 
-The isolated branch now registers Lambda and Azure Functions, validates native
+The canonical authored source registers Lambda and Azure Functions, validates native
 routing before agent dispatch and target/registry writes, and uses a shared
 first-error sequence model for cohesive provider orchestration. This candidate
 passed compilation, native protocol/conformance and focused API/registry tests
@@ -301,7 +337,8 @@ and returns an explicit unavailable result.
 The application page projects declared function contracts and observed versions,
 keeps empty execution inventory separate from deployment health, and offers one
 JSON invocation for the Lambda contract without retry. Ordinary and scheduled
-workload behavior remains under regression checks. New API/registry checks and Node function/gateway checks passed. The native
-packages recorded 88.2% Lambda and 92.4% Azure statement coverage. Generated
-contract files were refreshed through `heimdall contract`; full-suite freshness
-checks and compiler 28 browser acceptance require the next coordinated slot.
+workload behavior remains under regression checks. New API/registry checks and Node function/gateway checks passed. The corrected native
+packages recorded 90.5% Lambda and 92.4% Azure statement coverage. Generated
+contract files were refreshed through `heimdall contract`; the full 31-package
+run passed. Compiler 31 HTTP and website gates passed; the 13 full-path browser
+scenarios remain blocked by the setup sync timeout and have not executed.

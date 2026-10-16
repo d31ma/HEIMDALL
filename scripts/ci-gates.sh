@@ -22,10 +22,75 @@ pass() {
 # upstream's code and are exempt, and test files legitimately mention the words
 # these gates search for.
 first_party_go() {
-  find cmd internal -name '*.go' \
+  find app -name '*.go' \
     -not -name '*_test.go' \
-    -not -path 'internal/store/fylo/*' \
-    -not -path 'internal/schema/chex/*'
+    -not -path 'app/node_modules/*' \
+    -not -path 'app/dist/*' \
+    -not -path 'app/tests/*' \
+    -not -path 'app/server/repositories/store/fylo/*' \
+    -not -path 'app/server/helpers/schema/chex/*'
+}
+
+go_has_package() {
+  grep -Eq '^[[:space:]]*package[[:space:]]+[[:alnum:]_]+' "$1"
+}
+
+yon_source_go() {
+  local source_file
+  while IFS= read -r source_file; do
+    if ! go_has_package "$source_file"; then
+      printf '%s\n' "$source_file"
+    fi
+  done < <(find app/server -maxdepth 2 -type f -name '*.go' -not -name '*_test.go')
+}
+
+application_boundary_files() {
+  find app/client website/client -type f 2>/dev/null || true
+  yon_source_go
+}
+
+source_sha256() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{ print $1 }'
+    return
+  fi
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | awk '{ print $1 }'
+    return
+  fi
+  printf '%s\n' 'CHECKSUM_TOOL_UNAVAILABLE'
+}
+
+website_storage_hits() {
+  local preference_file='website/client/shared/utils/ThemePreferenceUtils.js'
+  local preference_sha='c4edc2fb074b0613300722de3c130571c9f85686539b68ef53e22ced4a50791b'
+  local writer_file='website/client/services/ThemeService.js'
+  local writer_sha='5dc2a81beb40ac5bd855d4076a9e0886f9c7e414d4a22491ba12fda3d42dd368'
+  local site_file
+  if [ -f "$preference_file" ] && [ "$(source_sha256 "$preference_file")" != "$preference_sha" ]; then
+    printf '%s\n' 'the public website theme preference helper differs from its audited hd-site-theme contract'
+  fi
+  if [ -f "$writer_file" ] && [ "$(source_sha256 "$writer_file")" != "$writer_sha" ]; then
+    printf '%s\n' 'the public website theme writer differs from its audited light/dark caller'
+  fi
+  while IFS= read -r site_file; do
+    if grep -Eq '(localStorage|sessionStorage)[[:space:]]*[.[]' "$site_file" && [ "$site_file" != "$preference_file" ]; then
+      printf '%s\n' "public website storage access is outside the audited theme preference helper: $site_file"
+    fi
+    if grep -Eq 'ThemePreferenceUtils[[:space:]]*[.][[:space:]]*write[[:space:]]*\(' "$site_file" && [ "$site_file" != "$writer_file" ]; then
+      printf '%s\n' "a new public website theme storage writer is unaudited: $site_file"
+    fi
+  done < <(find website/client -type f 2>/dev/null || true)
+}
+
+application_session_files() {
+  find app/client -type f 2>/dev/null || true
+  yon_source_go
+}
+
+application_boundary_hits() {
+  local expression="$1"
+  application_boundary_files | xargs grep -nE "$expression" 2>/dev/null || true
 }
 
 # ---------------------------------------------------------------------------
@@ -86,18 +151,18 @@ fi
 # Gate 3 — no cloud SDK outside an adapter or the secret resolver.
 #
 # Adapters are the only code that knows a cloud *runtime* exists, and
-# internal/secrets is the one place that knows cloud *secret stores* exist —
+# app/server/helpers/secrets is the one place that knows cloud *secret stores* exist —
 # the Phase 5 deliverable put it there deliberately. Everything else stays
 # cloud-blind. Enforced from Phase 0 so it is never retrofitted across a
 # codebase that already leaked.
 # ---------------------------------------------------------------------------
 sdk_hits=$(first_party_go \
-  | grep -v '^internal/provider/' \
-  | grep -v '^internal/secrets/' \
+  | grep -v '^app/server/services/provider/' \
+  | grep -v '^app/server/helpers/secrets/' \
   | xargs grep -nE 'aws-sdk-go|Azure/azure-sdk|cloud\.google\.com/go|google\.golang\.org/api' 2>/dev/null \
   || true)
 if [ -n "$sdk_hits" ]; then
-  fail "a cloud SDK is imported outside internal/provider/"
+  fail "a cloud SDK is imported outside app/server/services/provider/ or app/server/helpers/secrets/"
   printf '%s\n' "$sdk_hits" >&2
 else
   pass "no cloud SDK outside adapters"
@@ -128,8 +193,10 @@ fi
 # ---------------------------------------------------------------------------
 # Gate 6 — no dumping-ground packages.
 # ---------------------------------------------------------------------------
-dumping=$(find internal -type d \
+dumping=$(find app/server -type d \
   \( -name utils -o -name helpers -o -name common -o -name shared -o -name misc -o -name base -o -name manager \) \
+  -not -path 'app/server/helpers' \
+  -not -path 'app/server/utils' \
   || true)
 if [ -n "$dumping" ]; then
   fail "a dumping-ground package exists"
@@ -139,46 +206,212 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Gate 7 — the web tier holds no authority.
+# Gate 7 — browsers and the Yon BFF hold no authority.
 #
 # Tachyon attaches a session and forwards. A role name, a permission check, or
 # a decision about what a user may do would be a second authority over a
 # question SESAME already answered (ADR 0009).
 # ---------------------------------------------------------------------------
-if [ -d web ]; then
-  web_authz=$(grep -rnE \
+if [ -d app ]; then
+  web_authz=$(application_boundary_hits \
     '(==|!=)[[:space:]]*.(viewer|operator|admin|owner).|\bcanSync\b|\bhasPermission\b|\bisAdmin\b' \
-    web/client web/server 2>/dev/null || true)
+    )
   if [ -n "$web_authz" ]; then
-    fail "the web tier is making an authorization decision"
+    fail "the browser or Yon BFF is making an authorization decision"
     printf '%s\n' "$web_authz" >&2
   else
-    pass "no authorization logic in the web tier"
+    pass "no authorization logic in browsers or the Yon BFF"
   fi
 
   # The session must never be readable by script — a token in web storage is a
   # credential an injected script can exfiltrate. Matching a member access
   # rather than the bare word keeps the gate from firing on a comment that
   # explains the rule, which is how the first version of it failed.
-  web_storage=$(grep -rnE '(localStorage|sessionStorage)[[:space:]]*[.[]' \
-    web/client web/server 2>/dev/null || true)
+  web_storage=$(application_session_files | xargs grep -nE '(localStorage|sessionStorage)[[:space:]]*[.[]' 2>/dev/null || true)
+  web_storage+="$(website_storage_hits)"
   if [ -n "$web_storage" ]; then
-    fail "the web tier stores something in web storage; the session belongs in an httpOnly cookie"
+    fail "the browser or Yon BFF stores something in web storage; the session belongs in an httpOnly cookie"
     printf '%s\n' "$web_storage" >&2
   else
     pass "no browser-readable session storage"
   fi
 
   # TLS verification must never be skippable.
-  web_tls=$(grep -rnE 'rejectUnauthorized[[:space:]]*:[[:space:]]*false|NODE_TLS_REJECT_UNAUTHORIZED' \
-    web/client web/server 2>/dev/null || true)
+  web_tls=$(application_boundary_hits 'rejectUnauthorized[[:space:]]*:[[:space:]]*false|NODE_TLS_REJECT_UNAUTHORIZED|InsecureSkipVerify[[:space:]]*:[[:space:]]*true' \
+    )
   if [ -n "$web_tls" ]; then
-    fail "the web tier can skip TLS verification"
+    fail "the browser or Yon BFF can skip TLS verification"
     printf '%s\n' "$web_tls" >&2
   else
     pass "no way to skip TLS verification"
   fi
 fi
+
+check_native_test_source() {
+  local test_file="$1"
+  local source_folder="app/server/${test_file#tests/server/}"
+  local source_file source_package test_package
+  case "$test_file" in
+    *_test.go) ;;
+    *) return 1 ;;
+  esac
+  source_folder="${source_folder%/*}"
+  if ! go_has_package "$test_file"; then
+    return 1
+  fi
+  test_package=$(sed -nE 's/^[[:space:]]*package[[:space:]]+([[:alnum:]_]+).*/\1/p' "$test_file" | head -n 1)
+  while IFS= read -r source_file; do
+    source_package=$(sed -nE 's/^[[:space:]]*package[[:space:]]+([[:alnum:]_]+).*/\1/p' "$source_file" | head -n 1)
+    if [ -n "$source_package" ] && { [ "$test_package" = "$source_package" ] || [ "$test_package" = "${source_package}_test" ]; }; then
+      return 0
+    fi
+  done < <(find "$source_folder" -maxdepth 1 -type f -name '*.go' 2>/dev/null || true)
+  return 1
+}
+
+check_all_web_layout() {
+  local layout_failure=0
+  local source_file forbidden_path legacy_imports
+  for forbidden_path in internal server cmd web go.mod go.sum; do
+    if [ -e "$forbidden_path" ] || [ -L "$forbidden_path" ]; then
+      fail "root $forbidden_path is not a supported HEIMDALL source location; backend code belongs under app/server"
+      layout_failure=1
+    fi
+  done
+  while IFS= read -r source_file; do
+    fail "Go application source is outside app: $source_file"
+    layout_failure=1
+  done < <(find . \( -path './app' -o -path './testdata' -o -path './tests/server' -o -path './.git' -o -path './.agents' -o -path './.codex' -o -path './.aws' \) \
+    -prune -o -type f -name '*.go' -print)
+
+  while IFS= read -r source_file; do
+    fail "native Go tests belong under sibling tests/server, not production app/server: $source_file"
+    layout_failure=1
+  done < <(find app/server -type f -name '*_test.go')
+  if [ -e app/tests ] || [ -L app/tests ]; then
+    fail "application tests belong under sibling tests/app, not app/tests"
+    layout_failure=1
+  fi
+  while IFS= read -r source_file; do
+    if ! check_native_test_source "$source_file"; then
+      fail "native test source must mirror a production package and declare its package label: $source_file"
+      layout_failure=1
+    fi
+  done < <(find tests/server -type f -name '*.go' 2>/dev/null || true)
+
+  while IFS= read -r source_file; do
+    case "${source_file##*/}" in
+      *Controller.go) ;;
+      *) fail "Yon controller files must end with Controller.go: $source_file"; layout_failure=1 ;;
+    esac
+  done < <(find app/server/controllers -maxdepth 1 -type f -name '*.go')
+
+  while IFS= read -r source_file; do
+    if go_has_package "$source_file"; then
+      case "$source_file" in
+        app/server/commands/heimdall/*|app/server/commands/fake-engine/*|app/server/services/api/*|\
+        app/server/services/agent/*|app/server/services/auth/*|app/server/services/dispatch/*|app/server/services/enroll/*|\
+        app/server/services/observe/*|app/server/services/provider/*|app/server/services/reconcile/*|app/server/services/registry/*|app/server/services/render/*|\
+        app/server/utils/cron/*|app/server/utils/diff/*|app/server/utils/sequence/*|\
+        app/server/helpers/git/*|app/server/helpers/schema/*|app/server/helpers/secrets/*|\
+        app/server/models/spec/*|app/server/repositories/store/*) ;;
+        *) fail "native Go package is outside its authorized app/server role and domain: $source_file"; layout_failure=1 ;;
+      esac
+    else
+      case "${source_file%/*}" in
+        app/server/controllers|app/server/services|app/server/helpers|app/server/models) ;;
+        *) fail "Yon fragment is outside immediate controller/service/helper/model roles: $source_file"; layout_failure=1 ;;
+      esac
+    fi
+  done < <(find app -type f -name '*.go' -not -name '*_test.go' \
+    -not -path 'app/tests/*' -not -path 'app/node_modules/*' -not -path 'app/dist/*')
+
+  legacy_imports=$(grep -rnE \
+    '^[[:space:]]*(import[[:space:]]+)?([[:alnum:]_.]+[[:space:]]+)?"github\.com/d31ma/heimdall/(internal|server)(/|")' \
+    app/server tests/server --include='*.go' 2>/dev/null || true)
+  if [ -n "$legacy_imports" ]; then
+    fail "application source imports a legacy root internal/server package path"
+    printf '%s\n' "$legacy_imports" >&2
+    layout_failure=1
+  fi
+  if [ "$layout_failure" -eq 0 ]; then
+    pass "all backend code occupies app/server roles with explicit native Go/Yon boundaries"
+  fi
+}
+
+check_all_web_layout
+
+check_web_backend() {
+  local web_layout_failure=0
+  local web_file web_authority_imports web_data_logic
+  if [ ! -d app ]; then
+    return
+  fi
+  if [ -e app/internal ] || [ -L app/internal ]; then
+    fail "app/internal is not a supported production backend location"
+    web_layout_failure=1
+  fi
+
+  if [ -e app/server/shared ] || [ -L app/server/shared ]; then
+    fail "app/server/shared is not a supported production backend location; data types belong in models"
+    web_layout_failure=1
+  fi
+
+  while IFS= read -r web_file; do
+    case "$web_file" in
+      app/playwright.config.js|app/tachyon-behaviors.d.ts|app/tachyon-env.d.ts|website/playwright.config.js|website/tachyon-env.d.ts|website/tachyon-behaviors.d.ts) ;;
+      *) fail "web executable JavaScript/TypeScript belongs in client or test tooling: $web_file"; web_layout_failure=1 ;;
+    esac
+  done < <(find app website -type f \( -name '*.js' -o -name '*.ts' -o -name '*.mjs' -o -name '*.cjs' \) \
+    -not -path 'app/client/*' -not -path 'app/tests/*' -not -path 'app/scripts/*' \
+    -not -path 'website/client/*' -not -path 'website/tests/*' -not -path 'website/scripts/*' \
+    -not -path 'app/node_modules/*' -not -path 'app/dist/*')
+
+  while IFS= read -r web_file; do
+    case "$web_file" in
+      app/server/go.mod|app/server/go.sum) ;;
+      *) fail "a second application Go module exists: $web_file"; web_layout_failure=1 ;;
+    esac
+  done < <(find app website tests -type f \( -name go.mod -o -name go.sum \) \
+    -not -path 'app/node_modules/*' -not -path 'app/dist/*')
+
+  web_authority_imports=$(application_boundary_hits \
+    'github\.com/d31ma/heimdall/(internal|server)(/|")|github\.com/d31ma/heimdall/app/server/|github\.com/d31ma/(sesame|fylo)')
+  if [ -n "$web_authority_imports" ]; then
+    fail "the browser or Yon BFF imports native control-plane, SESAME, or FYLO implementation"
+    printf '%s\n' "$web_authority_imports" >&2
+    web_layout_failure=1
+  fi
+
+  web_data_logic=$(yon_source_go | grep '^app/server/models/' | \
+    xargs grep -nE '^[[:space:]]*func[[:space:]]|^[[:space:]]*var[[:space:]]|^[[:space:]]*const[[:space:]]' 2>/dev/null || true)
+  while IFS= read -r web_file; do
+    if awk '
+      /^[[:space:]]*import[[:space:]]*\(/ { importing = 1; next }
+      importing && /^[[:space:]]*\)/ { importing = 0; next }
+      importing || /^[[:space:]]*import[[:space:]]+/ {
+        if (match($0, /"[^"]+"/)) {
+          name = substr($0, RSTART + 1, RLENGTH - 2); split(name, parts, "/");
+          if (parts[1] ~ /\./) { found = 1 }
+        }
+      }
+      END { exit !found }
+    ' "$web_file"; then
+      fail "a Yon BFF fragment imports a non-standard-library package: $web_file"
+      web_layout_failure=1
+    fi
+  done < <(yon_source_go)
+  if [ -n "$web_data_logic" ]; then
+    fail "Yon BFF models contain executable code or global state"
+    printf '%s\n' "$web_data_logic" >&2
+    web_layout_failure=1
+  fi
+  if [ "$web_layout_failure" -eq 0 ]; then
+    pass "browser and immediate Yon BFF source preserve their forwarding-only authority boundary"
+  fi
+}
+
+check_web_backend
 
 if [ "$failures" -gt 0 ]; then
   printf '\n%d gate(s) failed\n' "$failures" >&2

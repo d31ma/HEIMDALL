@@ -10,7 +10,7 @@ password='correct-horse-battery-staple-9271'
 work=$(mktemp -d /tmp/hd-dr.XXXXXX)
 trap 'pkill -f "hd-dr serve" 2>/dev/null || true; rm -rf "$work"' EXIT
 
-go build -o "$work/hd-dr" ./cmd/heimdall
+go -C app/server build -o "$work/hd-dr" ./commands/heimdall
 export HD_PUBLIC_URL=https://127.0.0.1:18543 HD_ADMIN_PASSWORD="$password"
 
 echo "== a live control plane with a session =="

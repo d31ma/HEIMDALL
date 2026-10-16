@@ -41,8 +41,8 @@ docker version >/dev/null 2>&1 || fail "the Docker daemon is not running"
 
 step "Building heimdall"
 cd "$(dirname "$0")/.."
-go build -ldflags "-X main.version=$(cat VERSION)" -o "$ROOT.bin" ./cmd/heimdall 2>/dev/null || {
-  mkdir -p "$(dirname "$ROOT.bin")"; go build -o "$ROOT.bin" ./cmd/heimdall
+go -C app/server build -ldflags "-X main.version=$(cat VERSION)" -o "$ROOT.bin" ./commands/heimdall 2>/dev/null || {
+  mkdir -p "$(dirname "$ROOT.bin")"; go -C app/server build -o "$ROOT.bin" ./commands/heimdall
 }
 HEIMDALL="$ROOT.bin"
 

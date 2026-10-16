@@ -1,5 +1,10 @@
 # Phase 5 evidence — Enterprise controls
 
+Package references below use the 2026-10-03 `app/server/` layout. These results
+remain historical evidence from their original source snapshots; the package
+move does not requalify them. External runtime receipts retain original paths
+and hashes.
+
 ## Exit criterion
 
 > An Okta or Entra ID group grants `operator` on a project through SCIM
@@ -24,7 +29,7 @@ mapping — which is authorization shape, not user administration.
   displayName maps to a shipped role bundle scoped to one project's subtree
   (`project:alpha:*`). Enforcement happens as group documents flow past;
   half-failed attempts resume without minting duplicate roles.
-- **Secret-manager integrations** (`internal/secrets`): `local/` (AES-256-GCM
+- **Secret-manager integrations** (`app/server/helpers/secrets`): `local/` (AES-256-GCM
   sealed files beside the TLS keys), `aws-sm/`, `azure-kv/`, `gcp-sm/`.
   Unknown schemes are refused with directions — a typo that silently resolved
   from the wrong store would be a wrong-environment secret in a production

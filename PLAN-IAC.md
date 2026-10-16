@@ -39,7 +39,8 @@ Two consequences drive the entire design:
 **1. Terraform is a second reconciler shape, not a fifth `Provider` adapter.** Forcing it
 into the `Provider` interface from `PLAN.md` would mean faking a `Plan()` that wraps an
 engine that already has one, and an `Observe()` that cannot answer without a state file.
-It gets its own package, `internal/infra/`, and its own state machine.
+The proposed post-GA package is `app/server/services/infra/`, with its own state
+machine. It is not implemented or introduced by the current package relocation.
 
 **2. Rollback is not rollback.** Re-applying revision N−1 is a *forward* apply with its own
 plan and its own approval. Reverting the commit that created an RDS instance destroys the

@@ -1,0 +1,11 @@
+.site-theme-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  background: currentColor;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+}
+.site-theme-icon-dark { mask-image: url("/shared/assets/theme-dark.svg"); }
+.site-theme-icon-light { mask-image: url("/shared/assets/theme-light.svg"); }

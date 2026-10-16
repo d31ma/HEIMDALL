@@ -26,7 +26,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version-file: app/server/go.mod
+          cache-dependency-path: app/server/go.sum
 
       - name: Verify the tag matches VERSION
         # A tag that disagrees with the committed VERSION file would ship a
@@ -53,8 +54,8 @@ jobs:
       - name: Run the tests and gates first
         # A release is not a place to discover the build is broken.
         run: |
-          go vet ./...
-          go test -count=1 ./...
+          scripts/native-go.sh vet
+          scripts/native-go.sh test -count=1
           scripts/ci-gates.sh
 
       - name: Build every platform
@@ -66,8 +67,8 @@ jobs:
             output="dist/heimdall_${version}_${os}_${arch}"
             [ "$os" = "windows" ] && output="${output}.exe"
             CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" \
-              go build -trimpath -ldflags "-s -w -X main.version=${version}" \
-              -o "$output" ./cmd/heimdall
+              go -C app/server build -trimpath -ldflags "-s -w -X main.version=${version}" \
+              -o "$GITHUB_WORKSPACE/$output" ./commands/heimdall
           done
 
       - name: Checksums

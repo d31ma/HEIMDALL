@@ -31,7 +31,7 @@ DUVAY_VERSION="26.34.03"
 DUVAY_SHA256="ef6dd576db2228e4f4da45646cd66eabbfc3b431a99eed4a7a25ff5cbf84865d"
 
 source_root="${1:-..}"
-destinations="web/client/shared/assets/duvay website/client/shared/assets/duvay"
+destinations="app/client/shared/assets/duvay website/client/shared/assets/duvay"
 
 source_file="$source_root/DUVAY/dist/duvay.min.css"
 origin="checkout $source_file"

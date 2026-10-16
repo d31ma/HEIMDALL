@@ -20,6 +20,34 @@ up Prometheus, Grafana, and Loki alongside.
 > and drilled backup/restore. Each phase's evidence file
 > (docs/PHASE_*_EVIDENCE.md) records exactly what is proven and what is not.
 
+The current authored version is `26.34.01-1`. Its migration adds explicit native
+AWS Lambda and Azure Functions contracts alongside the existing Cloud Run
+container adapter; images and invocation contracts are provider-specific.
+At source baseline `5459b2973a45c6b43f2d18564ff492c54624ea06`, the Lambda and Azure
+Functions package suites passed with 90.5% and 92.4% statement coverage,
+respectively. These adapter/SDK-boundary results do not establish function-host
+or live-cloud qualification. Live-cloud validation remains absent.
+
+The Tac app and public website passed local consumer checks with qualified
+Tachyon compiler 31, source `3b6589f22acbe73a1b3ddcc75ea4438ec286d3de`.
+The fresh eight-route app build, semantic check and 22 browser assertions passed;
+the original QA driver's cleanup failure and verified recovery remain recorded
+separately. The subsequent 49 Go Yon HTTP boundary tests passed without skips,
+and the fresh eleven-route website build, semantic check and five browser tests
+passed with source hashes unchanged and owned cleanup complete.
+The native qualification checkpoint passed all 31 Go packages, vet, an isolated
+Go 1.26 control-plane build and the measured complexity gate across 1,062 changed
+methods (maximum CRAP 13.125, limit 15). The five earlier complexity failures
+are repaired.
+The 13 ordinary full-path browser scenarios remain unqualified: the first
+attempt failed before building; the second built the Go 1.27 control plane and
+fixture engine, initialized and logged in, then timed out during API setup
+before any browser test. A setup-only diagnostic isolated the second sync after
+a revision change; its cause and repair remain under investigation.
+No qualified Linux CI artifact or native function-host validation is available.
+See [the web tier README](app/README.md) and
+[the serverless plan](docs/SERVERLESS-PLAN.md) for their distinct gates.
+
 ## How it works
 
 ```
@@ -42,10 +70,14 @@ HEIMDALL supervises three sibling binaries. Install them first:
 scripts/install-deps.sh
 ```
 
-That puts `fylo`, `sesame`, and `chex` in `~/.local/bin`. Then build:
+That puts `fylo`, `sesame`, and `chex` in `~/.local/bin`. In an isolated execution
+checkout, build the native command from the merged Go 1.27 module into an
+external directory. This new module layout still requires build qualification:
 
 ```bash
-go build -ldflags "-X main.version=$(cat VERSION)" -o heimdall ./cmd/heimdall
+export HD_BUILD_DIR=/tmp/heimdall-build
+mkdir -p "$HD_BUILD_DIR"
+go -C app/server build -ldflags "-X main.version=$(cat VERSION)" -o "$HD_BUILD_DIR/heimdall" ./commands/heimdall
 ```
 
 ## Quickstart
@@ -107,11 +139,11 @@ cannot be intercepted. See [ADR 0008](docs/adr/0008-agents-are-outbound-only-and
 
 | Process | Role |
 |---|---|
-| `heimdall serve` | Control plane. API, git sync, render, diff, reconcile workers, provider adapters, metrics proxy. **Owns every listener** |
+| `heimdall serve` | Go control plane. API, git sync, render, diff, reconcile workers, provider adapters, metrics proxy. Owns the control-plane listeners and security/persistence authorities |
 | ├─ `sesame` | Child process. Every authentication and authorization decision. NDJSON on stdin/stdout, no port |
 | ├─ `fylo` | Child process. Documents and queues. NDJSON on stdin/stdout, no port |
 | `heimdall agent` | Optional, on a Docker Engine host. Outbound-only mTLS. Applies plans, scrapes container stats |
-| `ty serve` | Tachyon web UI and BFF, proxying to the control-plane API |
+| `ty serve` | Tachyon Tac browser UI and annotated Go Yon BFF, forwarding to the control-plane API |
 
 Startup order is fixed and fail-closed: `fylo` → `sesame doctor` → `heimdall serve`.
 A child that will not start is fatal; the API returns `503` rather than serving
@@ -153,13 +185,19 @@ the obvious offenders outright.
 ## Development
 
 ```bash
-go test ./...          # 176 tests, against real git/fylo/sesame/chex binaries
-scripts/ci-gates.sh    # standing gates: no auth logic, no leaked secrets, no cloud SDK outside adapters
-scripts/e2e-docker.sh  # end to end against a live Docker Engine
-go vet ./...
+scripts/native-go.sh test
+scripts/native-go.sh vet
+scripts/ci-gates.sh
+scripts/e2e-docker.sh
 ```
 
-Tests that need a binary skip when it is absent, so a partial toolchain gives an
+The native runner must select explicit domain-package and command scopes and
+include the relocated `tests/server/` sources through an official Go overlay.
+The operational UI, HTTP and public-site browser suites live under `tests/app/`. The overlay must
+preserve private package access and prove test discovery; validation is pending. An unfiltered `./...`
+would include package-less Yon fragments, which require Tachyon-generated Go
+qualification instead. Keep runtime state, dependency caches and build products
+outside the canonical sync-backed source. Tests that need a binary skip when it is absent, so a partial toolchain gives an
 honest partial result rather than a false green. CI installs all three and fails
 if any is missing.
 
@@ -176,29 +214,74 @@ The vendored FYLO and CHEX Go shims are refreshed from their upstreams with
 
 ```
 api/                 versioned public contracts (generated)
-cmd/heimdall/        init | doctor | serve | contract | version
-                     login | app | diff | sync | enroll | agent
-internal/
-  spec/              DeploySpec, canonical JSON, content hash
-  render/            compose → DeploySpec: overlays, interpolation, secret refs
-  git/               mirror, ref resolution, file reads at a commit
-  schema/            CHEX validation of compose input and DeploySpec output
-  diff/              field-level diff, sync status, health rollup
-  reconcile/         refresh, status, sync, dry run, rollback
-  provider/          the adapter interface, Capabilities, conformance suite
-    docker/          the Docker Engine adapter, stdlib only
-  enroll/            enrollment tokens, the agent CA, the server certificate
-  dispatch/          rendezvous for outbound-only agents; Remote provider
-  agent/             the host process: enrol, poll, apply, report
-  store/             FYLO collections and typed documents
-  auth/              SESAME supervision, action vocabulary, Decide
-  api/               REST routes, authorization boundary, contract generation
-web/                 Tachyon web tier: two Tac pages, two Yon proxy routes
+app/                 HEIMDALL application implementation
+  client/pages/      five Tac views: home, application, instance, approval, registry
+  client/components/ scoped tac.html/tac.css views
+  client/services/   annotated page lifecycle and event coordination
+  client/models/     named browser data contracts
+  client/shared/     assets, styles, supported script facades and static utils
+  server/            merged Go 1.27 module: github.com/d31ma/heimdall/app/server
+    commands/heimdall/ native init, serve, CLI and agent entry point
+    commands/fake-engine/ isolated protocol-test command
+    controllers/     three annotated BFF HTTP fragments
+    services/        two BFF fragments plus native domain packages
+      api/ agent/ auth/ dispatch/ enroll/ observe/ provider/ reconcile/ registry/ render/
+      provider/      docker, ecs, aca, cloudrun, lambda, azurefunctions, conformance
+    helpers/         nine BFF fragments plus native git/, schema/ and secrets/
+      schema/chex/   vendored CHEX client
+    models/          nine BFF models plus native spec/ package
+      spec/          DeploySpec, canonical JSON and content hash
+    utils/          native cron/, diff/ and sequence/ packages
+    repositories/store/ native FYLO documents, collections and vendored fylo/ client
+website/             separate public Tachyon project: eleven page routes
 schemas/             *.schema.json for CHEX
+tests/server/        mirrored native Go package tests (official Go overlay)
+tests/app/           operational UI/HTTP and public-site browser suites
 testdata/compose/    conformance corpus
 docs/adr/            architecture decision records
 scripts/             dependency install, CI gates, e2e, client vendoring
 ```
+
+All HEIMDALL operational application logic belongs under `app/`; the separate
+public site belongs in sibling `website/`. The native Go
+control plane, agent and commands and the 23 thin BFF fragments share the merged
+`app/server/` Go 1.27 module. Commands live under `app/server/commands/`; no root
+`cmd/`, `server/`, `internal/` or Go module remains. Public API contracts, schemas
+and fixtures remain root assets rather than application implementations.
+Samuel's latest layout explicitly renames the operational `web/` root to `app/`
+and retains the public `website/` as its sibling; it supersedes the earlier
+all-under-`web/` arrangement.
+
+The co-located BFF has three controllers, two services, nine helpers and nine
+models. `GatewayCall`, `ProxyFrame` and `ProxyRequest` preserve their native Go
+fields. Native domain packages retain control-plane authority; the BFF still
+calls public HTTP and opens no FYLO root or SESAME engine. It imports no native
+authoritative package. The native HTTP API belongs to package `api` under
+`app/server/services/api/`; it is a normal native service, separate from the
+three actual Yon `Controller` fragments. Its tests mirror that service path.
+Qualified compiler 32 supports custom `@FromBody` models on annotated Go
+controllers. Moving the native API service does not complete the BFF's requested
+typed-model parsing/response migration: status, headers, cookies, body and native
+field admission still require distinct qualification.
+Provider SDKs stay in `app/server/services/provider/` and
+secret SDKs stay in `app/server/helpers/secrets/`.
+
+Explicit CI checks must enforce these authority and SDK boundaries. The merged
+module, native command scopes and co-located companion/framework source intake
+have not been qualified. Compiler 31/32 source review predicts `TY2015` for the
+native BFF model fields; a qualified native Go model admission path is required.
+Static companion-source review also predicts `TY1363` for unregistered native
+role packages and `TY1310` for native model/package layout checks on co-located
+native packages. These are source diagnoses with no current
+compiler execution; the native package admission bridge remains unqualified.
+No JSON approximation or vendor-type metadata substitutes for those models.
+The earlier 49 HTTP, 22 app browser and native 31-package/complexity results
+apply to their recorded earlier layouts. New native fixes are implemented but
+have not run their regression tests. No current runtime pass is claimed.
+
+The public site's eleven routes are the landing page, documentation overview,
+and nine topic pages. Its scoped components belong to `website/client/components/`;
+the five operational app views belong to `app/client/`.
 
 ## Licence
 

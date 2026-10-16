@@ -1,0 +1,237 @@
+{
+  "updated_utc": "2026-10-03T21:43:08.456802+00:00",
+  "project": "DELMA/HEIMDALL",
+  "source_baseline": "5459b2973a45c6b43f2d18564ff492c54624ea06",
+  "dirty_source_identity": "Use exact source hashes, not baseline HEAD alone.",
+  "layout": {
+    "application": "app/",
+    "public_website": "website/",
+    "tests": "tests/",
+    "native_api_service": "app/server/services/api/",
+    "native_utilities": "app/server/utils/{cron,diff,sequence}/",
+    "repository": "app/server/repositories/store/",
+    "native_module": "github.com/d31ma/heimdall/app/server",
+    "native_toolchain": "go1.27.1",
+    "yon_controllers": [
+      "AuditLoginController.go",
+      "GatewayController.go",
+      "SessionController.go"
+    ],
+    "bff_roles": {
+      "controllers": 3,
+      "services": 2,
+      "helpers": 9,
+      "models": 9
+    }
+  },
+  "authority": "One native heimdall serve owns FYLO root and SESAME engine; Yon BFF uses public HTTP.",
+  "items": [
+    {
+      "id": "HD-LAYOUT-07",
+      "status": "PASS_SOURCE_ONLY",
+      "outcome": "app, website and tests are siblings; no root web/internal/server/cmd/module; true Yon Controller files only under controllers; native HTTP API under services/api; utils role renamed.",
+      "evidence": "app-website-tests-layout03/WEB-BACKEND-LOCATION-AUDIT07.json",
+      "controls": {
+        "rejected_negative": 48,
+        "accepted_positive": 13
+      }
+    },
+    {
+      "id": "HD-TEST-LAYOUT-02",
+      "status": "PASS_SOURCE_MAPPING_RUNTIME_PENDING",
+      "outcome": "All51 native Go test sources moved to mirrored tests/server; 8 same-package and43 external tests preserve exact assertions/private access. Six UI/HTTP/browser sourcefiles in tests/app; actual runners updated.",
+      "evidence": "app-website-tests-layout03/TEST-PLACEMENT-AUDIT02.json",
+      "runtime_requirement": "Native05 actual overlay execution produced30of31 terminal packages and real assertions, but qualification failed. Native06 must complete all31 and all25test-backed suites with no individual skips."
+    },
+    {
+      "id": "HD-NATIVE-04",
+      "status": "FAILED_BEFORE_GO_RUNNER_BASH32_ERROR_PRESERVED",
+      "request": "NATIVE04-QUALIFICATION-REQUEST01.json",
+      "driver": "native_validation04.py",
+      "driver_sha256": "4b4ff9bf01ea728f96a1a236ac54249df5f294922e9b978fad63d523e6c14098",
+      "work_seconds": 270,
+      "cleanup_seconds": 30,
+      "total_seconds": 300,
+      "stage_files": 326,
+      "expected_packages": 31,
+      "plan": "First prove the preserved two-regression red failure, restore implemented convergence fix, execute all31 native packages using the real relocated-test runner, vet, measured changed-method CRAP<=15, and build native control plane. One bounded slot; owned PID cleanup; offline dependencies. No Tachyon/browser/livecloud in this slot.",
+      "run_started": false,
+      "actual_result": "native04-run01/result.json",
+      "actual_total_seconds": 0.479,
+      "actual_go_executions": 0,
+      "owned_cleanup_remaining": []
+    },
+    {
+      "id": "HD-PARTIAL-CONVERGENCE-02",
+      "status": "SOURCE_FIXED_REVIEWED_FROZEN_RUNTIME_UNRUN",
+      "outcome": "Per-service runtime proof retained; deadline/cancellation checked before additional runtime reads; bounded sleep preserves precise timeout diagnosis. Selective plans exclude untouched services before record/apply, including prune=true and dry-run. Sync stages extracted to satisfy changed-method cohesion/CRAP requirement. Existing assertions preserved.",
+      "remaining": "Fresh native06 red/focused/full runtime evidence, measuredCRAP,vet/build; no source-only qualification claim."
+    },
+    {
+      "id": "HD-YON-TYPED-02",
+      "status": "SUPPORTED_LANGUAGE_CONTRACT_MIGRATION_PENDING",
+      "evidence": "app-website-tests-layout03/YON-TYPED-CONTRACT-REVIEW02.json",
+      "outcome": "Qualified32 annotated Go controllers support @FromBody custom request and JSON response models. Plain Handler request restriction does not apply to those routes.",
+      "next": "Use custom typed session and gateway models only with explicit optionality, missing/unknown-field/error policy, request/response bounds, raw JSON preservation, cookie/header/status and native type admission checks.",
+      "blockers": [
+        "TY1363 nested native role/package admission",
+        "TY1310 native spec model package admission",
+        "TY2015 native RawMessage/Header/File/Request/Context/etc model fields",
+        "Qualified native Go package/module bridge missing",
+        "Plain custom response model serializes JSON only; dynamic transport status/header/cookie requires supported native response boundary",
+        "Yon32 reconstructed native request loses original peer/TLS/VerifiedChains/live client context; native agent mTLS authority stays native."
+      ],
+      "manual_parsers_removed": false
+    },
+    {
+      "id": "HD-FRAMEWORK-32",
+      "status": "EXACT_SCOPED_QUALIFIED_HANDOFF_VERIFIED_NO_CURRENT_CONSUMER_EXECUTION",
+      "artifact_sha256": "48ab6d5059f0b3c09a086508e40ee63cb59abf81dc17e0e7b931e1b0868376d7",
+      "source_commit": "31b60f886cb98c6da184d71083d8f66752186b08",
+      "manifest_sha256": "326def31e0126f55ad22fe1719c4e41eaf6183edba89f76d6a3d3b115112c3fc",
+      "rule": "Request newer scoped qualified handoff for real native/typed transport blockers; never substitute newer source-only candidate."
+    },
+    {
+      "id": "HD-AWS-REBASE-06",
+      "status": "FROZEN_CANDIDATE_ONLY_CANONICAL_INTEGRATION_HELD",
+      "evidence": "AWS-APP-LAYOUT-PINS06.json",
+      "receipt_sha256": "efd7340b8ca8e38c06c397cdb6e01374940838df185a67877a3aef8f9b2bdaa4",
+      "file_count": 13,
+      "semantic_delta": "Local import paths, physical source/test placement and gofmt only. No HostIP/restore candidate applied; schemas unchanged.",
+      "scope": "All13 mapped files frozen. AWS owner may prepare candidate-only rebase against exact pins; old root server/internal/web paths invalid. New-layout runtime qualification unrun."
+    },
+    {
+      "id": "HD-GRAPH-06",
+      "status": "HISTORICAL_SOURCE_SNAPSHOT_SUPERSEDED",
+      "evidence": "graphify-final06/graphify-out/receipt.json",
+      "files": 340,
+      "nodes": 3291,
+      "edges": 5315,
+      "workers": 1,
+      "api_calls": 0,
+      "llm_tokens": 0
+    },
+    {
+      "id": "HD-PROVIDERS",
+      "status": "HISTORICAL_NATIVE02_LOCAL_TESTS_PASS_CURRENT_LAYOUT_UNRUN_LIVE_CLOUD_MISSING",
+      "outcome": "Cloud Run container/job contract plus AWS Lambda image/runtime and Azure Functions adapters exist at app/server/services/provider. General containers are not presumed portable function images. Existing on-demand native control-plane authority retained.",
+      "qualification": "Earlier native02 local protocol/conformance/coverage receipts refer to earlier paths/source. No cloud provisioning/deployment/live support qualification authorized or performed."
+    },
+    {
+      "id": "HD-NATIVE-05",
+      "status": "FAILED_RED_PROVEN_GREEN30_OF31_TERMINALS_TIMEOUT_HISTORICAL_PRESERVED",
+      "request": "NATIVE05-QUALIFICATION-REQUEST01.json",
+      "driver": "native_validation05.py",
+      "driver_sha256": "a20b2883d865113d9648acdf17dc91c280d2d35f06e401a819687a5b5f0ca5a4",
+      "total_seconds": 300,
+      "work_seconds": 270,
+      "cleanup_seconds": 30,
+      "test_backed_packages": 25,
+      "build_only_packages": 6,
+      "source_changes_since_native04_failure": [
+        "MacBash3.2 runner avoids empty array expansion and preservesactualGoexit; fourrealBashstubsuccess/failurecontrols PASS; noGo test/build repeated."
+      ],
+      "policy": "Redproof then corrected31nativepackage compilation,25actualtestbackedpackage suites,vet,changed-methodCRAP<=15,CPbuild. Known six no-test-files package events classified build-only; noindividualtestskips admitted.",
+      "next_grant_required": true,
+      "actual_result": "native05-run01/result.json",
+      "lane_return": "HEIMDALL-NATIVE05-LANE-RETURN01.json",
+      "actual_elapsed_seconds": 226.343,
+      "red_proven": true,
+      "green_missing_packages": [
+        "github.com/d31ma/heimdall/app/server/services/render"
+      ],
+      "vet": "NOT_RUN",
+      "crap": "NOT_RUN",
+      "build": "NOT_RUN",
+      "remaining": "Superseded run configuration is stale; do not re-use."
+    },
+    {
+      "id": "HD-NATIVE-06",
+      "status": "FROZEN_RUNTIME_UNRUN_FRESH_GRANT_RETURNED_RESOURCE_ADMISSION_FAILED",
+      "request": "NATIVE06-QUALIFICATION-REQUEST12.json",
+      "config_sha256": "5078c78f7bf087b18b09981b3a599056fa25aa8f730a6bae91764b4494b3791c",
+      "driver_sha256": "f32fa9ad3c16340f0572ebf1679a06bc69ec6c2882ff71f6ebaef74bbb3b3884",
+      "total_seconds": 420,
+      "work_seconds": 390,
+      "cleanup_seconds": 30,
+      "stage_files": 328,
+      "native_production_go_files": 261,
+      "native_test_files": 51,
+      "test_backed_packages": 25,
+      "build_only_packages": 6,
+      "focused_top_level_controls": 19,
+      "full_suite_order": "Render first, all31 packages retained.",
+      "source_review": "native06-source-review12/SOURCE-REVIEW-FREEZE12.json",
+      "canonical_aws_changes": 0,
+      "browser_source_changes": "20 externally changed browser files preserved; writer not inferred; excluded from native scope.",
+      "heavy_executions": 0,
+      "lane_return": "HEIMDALL-NATIVE06-LANE-RETURN13.json",
+      "native06_driver_executions": 0,
+      "fresh_grant_required": true,
+      "resource_failure_evidence": "AssertionError: Adverse pageout/swapout trend: return lane without launch"
+    },
+    {
+      "id": "HD-GRAPH-12",
+      "status": "PASS_SOURCE_STABLE_CODE_ONLY_RUNTIME_UNRUN",
+      "evidence": "graphify-final12/graphify-out/receipt.json",
+      "files": 342,
+      "nodes": 3349,
+      "edges": 5405,
+      "workers": 1,
+      "api_calls": 0,
+      "llm_tokens": 0,
+      "source_snapshot_sha256": "8f8aad9eda131aa343fc1bc9b5dcaaddd554480ea9d800928b4a784590077e10",
+      "external_browser_changes": "Preserved current bytes included structurally; no runtime or semantic qualification inferred."
+    }
+  ],
+  "prior_runtime_checkpoints": "Compiler31 HTTP49, app22 and publicsite5 passed on earlier exact sources; original app harness cleanup failure preserved and separately recovered. Native02 all31 package/vet/AST/CRAP/build proof historical. Setup-only31 failed at second sync41.783s; owned cleanup complete, lane returned. No new fullpath retry.",
+  "lane": "LANE_RETURNED_ADMISSION_ABORTED_ADVERSE_RESOURCE_DELTA_NO_NATIVE06_LAUNCH; no owned HEIMDALL command. Grant returned unused for native qualification; no retry.",
+  "metadata_sharing": "Automatic approval review rejected detailed new repository metadata publication to Dropbox. New receipts kept privately in Developer/Build; no sharing workaround or further publication attempted.",
+  "not_authorized": [
+    "Paid/cloud resource provisioning",
+    "Cloud deployment or traffic migration",
+    "IAM/network/security changes",
+    "Credential/API key creation",
+    "Remote push/publication",
+    "AWS live topology changes"
+  ],
+  "native04_lane_return": {
+    "status": "FAILED_BEFORE_GO_OWNED_CLEANUP_PASS_SOURCE_STABLE_AT_FAILURE",
+    "result": "native04-run01/result.json",
+    "elapsed_seconds": 0.479,
+    "no_heavy_runtime_running": true,
+    "cloud_calls": 0,
+    "publication_calls": 0
+  },
+  "native05_source_review": {
+    "receipt": "NATIVE05-SOURCE-DRIFT-REVIEW09.json",
+    "status": "HISTORICAL_NATIVE05_DRIFT_REVIEW_AND_FAILED_RUN_PRESERVED",
+    "source_pins_all_match": false,
+    "active_config_sha256": "4075c4b28c8f7d2676a2e695da5b08698f7852298833dbf2ac5f2f80b2ca4abf",
+    "one_import_only_drift_retained": true,
+    "fresh_grant_required": true,
+    "native05_has_not_run": false,
+    "pin_status_note": "Historical native05 pins matched that failed run; source fixes now supersede them. Native06 exact current pins verified."
+  },
+  "native05_actual_failure_review": {
+    "source": "native05-run01/green-full-go.log",
+    "failed_controls": [
+      "TestConvergenceRequiresCurrentPlanProof/missing-proof",
+      "TestConvergenceRequiresCurrentPlanProof/wrong-spec",
+      "TestConvergenceRequiresCurrentPlanProof/wrong-target",
+      "TestConvergenceRequiresCurrentPlanProof/wrong-app",
+      "TestConvergenceRequiresCurrentPlanProof/duplicate-conflict",
+      "TestConvergenceRequiresCurrentPlanProof/unknown-operation",
+      "TestConvergenceRequiresCurrentPlanProof/read-error",
+      "TestConvergenceRequiresCurrentPlanProof/observe-read-error",
+      "TestConvergenceRequiresCurrentPlanProof/missing-live",
+      "TestConvergenceRequiresCurrentPlanProof/degraded-live",
+      "TestConvergenceRequiresCurrentPlanProof",
+      "TestPartialSelectiveSyncIgnoresUntouchedPlanChanges"
+    ],
+    "warning": "Actual failure evidence preserved. Source causal review identifies selective prune leak before convergence and expired-context polling overwriting precise proof reason. Render admitted0.332s before command end; no render hang inferred. New source candidate unrun.",
+    "scope": "Source fixes/review/freeze complete; native06 fresh grant required.",
+    "source_review": "native06-source-review12/SOURCE-REVIEW-FREEZE12.json"
+  },
+  "external_source_changes_preserved": "native06-source-review12/EXTERNAL-CHANGES-PRESERVED12.json;20browserfiles retained, no edits or runtime claim."
+}

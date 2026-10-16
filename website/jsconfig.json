@@ -1,5 +1,4 @@
 {
-  "//": "The website's JSDoc gate. Same contract as web/jsconfig.json: annotations are the type system, and checkJs makes them a build step rather than a decoration. TypeScript comes from ../web/node_modules, as Tailwind already does.",
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
@@ -19,9 +18,13 @@
       "/shared/*": [
         "./client/shared/*"
       ]
-    }
+    },
+    "experimentalDecorators": true,
+    "types": []
   },
   "include": [
+    "tachyon-env.d.ts",
+    ".tachyon/types/client",
     "client/**/*.js"
   ],
   "exclude": [

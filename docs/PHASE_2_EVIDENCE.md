@@ -1,5 +1,10 @@
 # Phase 2 evidence — GitOps completeness
 
+Package references below use the 2026-10-03 `app/server/` layout. These results
+remain historical evidence from their original source snapshots; the package
+move does not requalify them. External runtime receipts retain original paths
+and hashes.
+
 What the phase claimed, what is true, and how to check it.
 
 ## Exit criteria
@@ -16,7 +21,7 @@ What the phase claimed, what is true, and how to check it.
 
 ## What was built
 
-- **Auto-sync and self-heal as one loop** (`internal/reconcile/auto.go`).
+- **Auto-sync and self-heal as one loop** (`app/server/services/reconcile/auto.go`).
   `Status` refreshes git and reads live state, so a new commit and a killed
   container arrive as the same OutOfSync observation; the two policy flags
   only decide which of them an application consented to. Suspend beats every

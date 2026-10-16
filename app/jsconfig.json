@@ -1,0 +1,45 @@
+{
+  "//": "JSDoc is the type system here: no build step, no .ts files, just annotations the editor and `npm run typecheck` both read. checkJs turns them from documentation into a gate.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "types": [
+      "node"
+    ],
+    "paths": {
+      "/shared/*": [
+        "./client/shared/*"
+      ],
+      "/models/*": [
+        "./client/models/*"
+      ]
+    },
+    "experimentalDecorators": true
+  },
+  "include": [
+    ".tachyon/types/client",
+    "tachyon-behaviors.d.ts",
+    "tachyon-env.d.ts",
+    "client/**/*.js",
+    "server/**/*.js",
+    "../tests/app/**/*.js",
+    "playwright.config.js"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "client/shared/assets"
+  ]
+}

@@ -1,0 +1,39 @@
+/* HEIMDALL's own layer over DuVay.
+ *
+ * Layout, spacing, and typography live as Tailwind utilities in the markup
+ * (tailwind.css is generated from tailwind.src.css by `npm run css`). What
+ * remains here is only what utilities cannot carry: the base document, token
+ * aliases used across many templates, child-selector interactions, the
+ * scroll edge-fade trick, keyframes, and the global accessibility rules.
+ *
+ * The token names are DuVay's: --w-surface, --w-text, --w-border. The
+ * fallbacks after each are a light-theme approximation, and they are the
+ * reason a mistyped token name is invisible until someone switches to dark —
+ * which is exactly how the first version of this file shipped half-themed. */
+
+/* Layer order is the contract: DuVay first, utilities last, so a Tailwind
+ * utility in the markup reliably overrides a DuVay base rule (an unlayered
+ * DuVay would beat every layered utility on any conflict — that is how the
+ * tree SVG first got squeezed by DuVay's max-width). This file itself stays
+ * unlayered and outranks both. */
+@layer duvay, properties, theme, utilities;
+@import url("/shared/assets/duvay/duvay.min.css") layer(duvay);
+@import url("/shared/styles/tailwind.css");
+
+body {
+  margin: 0;
+  background: var(--w-surface, #fff);
+  color: var(--w-text, #111);
+  font-family: var(--w-font-family, system-ui, sans-serif);
+}
+
+/* Brand: the primary is Heimdallr's amber, the same family as the mark.
+ * One override reaches everything that reads the token — buttons, links,
+ * the view toggle, focus rings, and the chart line itself. Light theme gets
+ * the darker roast so text and fills keep their contrast on white; dark
+ * theme gets the glow. */
+:root, [w-theme="light"] { --w-primary: #b45309; }
+[w-theme="dark"] { --w-primary: #f5a623; }
+@media (prefers-color-scheme: dark) {
+  [w-theme="auto"] { --w-primary: #f5a623; }
+}

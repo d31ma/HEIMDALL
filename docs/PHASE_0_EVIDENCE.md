@@ -1,5 +1,13 @@
 # Phase 0 evidence — Foundations and identity substrate
 
+Package references below use the 2026-10-03 `app/server/` layout. These results
+remain historical evidence from their original source snapshots; the package
+move does not requalify them. External runtime receipts retain original paths
+and hashes.
+Recorded command blocks retain their original snapshot paths and working
+directory. Current native qualification uses explicit scopes from
+`app/server/`; these historical commands are not current build instructions.
+
 What the phase claimed, what is actually true, and how to check it yourself.
 Anything not proven is listed as not proven.
 
@@ -41,12 +49,12 @@ Observed on the local run: 33 tests pass, ~2,750 lines of first-party Go.
 
 | Package | Responsibility |
 |---|---|
-| `internal/spec` | `DeploySpec`, canonical JSON, SHA-256 content addressing |
-| `internal/schema` | CHEX validation of compose input and `DeploySpec` output |
-| `internal/store` | FYLO collections, queue topics, bootstrap, projection rebuild |
-| `internal/auth` | SESAME supervision, action vocabulary, role bundles, fail-closed `Decide` |
-| `internal/api` | Authorization boundary, route table, generated contract |
-| `cmd/heimdall` | `init`, `doctor`, `serve`, `contract`, `version` |
+| `app/server/models/spec` | `DeploySpec`, canonical JSON, SHA-256 content addressing |
+| `app/server/helpers/schema` | CHEX validation of compose input and `DeploySpec` output |
+| `app/server/repositories/store` | FYLO collections, queue topics, bootstrap, projection rebuild |
+| `app/server/services/auth` | SESAME supervision, action vocabulary, role bundles, fail-closed `Decide` |
+| `app/server/services/api` | Authorization boundary, route table, generated contract |
+| `app/server/commands/heimdall` | `init`, `doctor`, `serve`, `contract`, `version` |
 
 The `${secret:...}` fixtures in the corpus carry references only; no fixture
 holds a value, and a gate checks for credential-shaped strings.
@@ -123,11 +131,11 @@ reproducible projection the crash-safety gate requires.
 
 ## Phase 1 preconditions this phase establishes
 
-- Every route added from here goes into the table in `internal/api/api.go` and
+- Every route added from here goes into the table in `app/server/services/api/api.go` and
   is authorized by construction; a route registered outside it is a review
   finding, and `TestUnauthenticatedSurfaceIsExactlyThree` bounds the exceptions.
 - Adding a compose feature is a four-part edit: `DeploySpec` field, CHEX schema
   entry, `Capabilities()` answer, and the pinned-hash bump if the canonical form
   changes.
 - The action vocabulary is closed and seeded as four role bundles. A new verb is
-  a deliberate edit to `internal/auth/actions.go`.
+  a deliberate edit to `app/server/services/auth/actions.go`.

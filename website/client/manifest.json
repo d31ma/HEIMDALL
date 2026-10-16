@@ -1,0 +1,11 @@
+{
+  "name": "HEIMDALL",
+  "short_name": "HEIMDALL",
+  "start_url": "/",
+  "display": "standalone",
+  "tac": {
+    "styles": [
+      "/shared/styles/site.css"
+    ]
+  }
+}
