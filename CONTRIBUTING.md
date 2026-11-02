@@ -3,7 +3,7 @@
 ## Before you start
 
 Read [PLAN.md](PLAN.md) for the architecture and roadmap, [CONTEXT.md](CONTEXT.md)
-for the domain language, and [AGENTS.md](AGENTS.md) for the rules that are
+for the domain language, and [CLAUDE.md](CLAUDE.md) for the rules that are
 non-negotiable. A change that violates one of those rules is a defect in the
 change, not a follow-up task.
 

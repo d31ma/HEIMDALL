@@ -475,7 +475,7 @@ always audited, and is off by default.
 ```
 HEIMDALL/
   README.md CHANGELOG.md VERSION LICENSE SECURITY.md CONTRIBUTING.md
-  AGENTS.md CLAUDE.md CONTEXT.md
+  CLAUDE.md CONTEXT.md
   api/                    versioned public contracts: openapi.json, schemas
   cmd/heimdall/           serve | agent | init | doctor | login | app | diff | sync
   internal/
